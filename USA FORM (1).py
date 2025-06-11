@@ -37,7 +37,7 @@ def init_db():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        
+
         # Create tables if they don't exist
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -48,7 +48,102 @@ def init_db():
                 is_vip INTEGER DEFAULT 0
             )
         """)
-        
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_name TEXT,
+                request_type TEXT,
+                identifier TEXT,
+                comment TEXT,
+                timestamp TEXT,
+                completed INTEGER DEFAULT 0
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS request_comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER,
+                user TEXT,
+                comment TEXT,
+                timestamp TEXT,
+                FOREIGN KEY (request_id) REFERENCES requests (id)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS mistakes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_leader TEXT,
+                agent_name TEXT,
+                ticket_id TEXT,
+                error_description TEXT,
+                timestamp TEXT
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS group_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender TEXT,
+                message TEXT,
+                timestamp TEXT
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS hold_images (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uploader TEXT,
+                image_data BLOB,
+                timestamp TEXT
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS late_logins (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_name TEXT,
+                presence_time TEXT,
+                login_time TEXT,
+                reason TEXT,
+                timestamp TEXT
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS quality_issues (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_name TEXT,
+                issue_type TEXT,
+                timing TEXT,
+                mobile_number TEXT,
+                product TEXT,
+                timestamp TEXT
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS midshift_issues (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_name TEXT,
+                issue_type TEXT,
+                start_time TEXT,
+                end_time TEXT,
+                timestamp TEXT
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                killswitch_enabled INTEGER DEFAULT 0,
+                chat_killswitch_enabled INTEGER DEFAULT 0
+            )
+        """)
+        cursor.execute("INSERT OR IGNORE INTO system_settings (id) VALUES (1)")
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS vip_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,13 +153,13 @@ def init_db():
                 mentions TEXT
             )
         """)
-        
+
         # Create default admin account
         cursor.execute("""
             INSERT OR IGNORE INTO users (username, password, role, is_vip) 
             VALUES (?, ?, ?, ?)
         """, ("taha kirri", hash_password("arise@99"), "admin", 1))
-        
+
         # Create other admin accounts
         admin_accounts = [
             ("taha kirri", "arise@99"),
@@ -73,13 +168,13 @@ def init_db():
             ("Youssef Kamal", "admin@006"),
             ("Fouad Fathi", "admin@55")
         ]
-        
+
         for username, password in admin_accounts:
             cursor.execute("""
                 INSERT OR IGNORE INTO users (username, password, role, is_vip) 
                 VALUES (?, ?, ?, ?)
             """, (username, hash_password(password), "admin", 0))
-        
+
         # Create agent accounts
         agents = [
             ("Karabila Younes", "30866"),
@@ -128,18 +223,18 @@ def init_db():
             ("Abdelhamid Jaber", "30708"),
             ("Yassine Elkanouni", "30735")
         ]
-        
+
         for agent_name, workspace_id in agents:
             cursor.execute("""
                 INSERT OR IGNORE INTO users (username, password, role, is_vip) 
                 VALUES (?, ?, ?, ?)
             """, (agent_name, hash_password(workspace_id), "agent", 0))
-        
+
         # Ensure taha kirri has VIP status
         cursor.execute("""
             UPDATE users SET is_vip = 1 WHERE LOWER(username) = 'taha kirri'
         """)
-        
+
         conn.commit()
     finally:
         conn.close()
