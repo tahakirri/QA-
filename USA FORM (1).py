@@ -10,44 +10,6 @@ import pandas as pd
 import json
 import pytz
 
-# Ensure 'data' directory exists before any DB connection
-os.makedirs("data", exist_ok=True)
-
-# --- Ensure DB migration for break_templates column ---
-def ensure_break_templates_column():
-    conn = sqlite3.connect("data/requests.db")
-    try:
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "break_templates" not in columns:
-            try:
-                cursor.execute("ALTER TABLE users ADD COLUMN break_templates TEXT")
-                conn.commit()
-            except Exception:
-                pass
-    finally:
-        conn.close()
-
-ensure_break_templates_column()
-
-def ensure_group_messages_reactions_column():
-    conn = sqlite3.connect("data/requests.db")
-    try:
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(group_messages)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "reactions" not in columns:
-            try:
-                cursor.execute("ALTER TABLE group_messages ADD COLUMN reactions TEXT DEFAULT '{}' ")
-                conn.commit()
-            except Exception:
-                pass
-    finally:
-        conn.close()
-
-ensure_group_messages_reactions_column()
-
 # --------------------------
 # Timezone Utility Functions
 # --------------------------
@@ -259,11 +221,11 @@ def init_db():
         cursor.execute("""
             INSERT OR IGNORE INTO users (username, password, role) 
             VALUES (?, ?, ?)
-        """, ("taha kirri", hash_password("Cursed@99"), "admin"))
+        """, ("taha kirri", hash_password("arise@99"), "admin"))
         
         # Create other admin accounts
         admin_accounts = [
-            ("taha kirri", "Cursed@99"),
+            ("taha kirri", "arise@99"),
             ("admin", "p@ssWord995"),
         ]
         
@@ -548,19 +510,16 @@ def add_reaction_to_message(message_id, emoji, username):
     finally:
         conn.close()
 
-def get_all_users(include_templates=False):
+def get_all_users():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        if include_templates:
-            cursor.execute("SELECT id, username, role, group_name, break_templates FROM users")
-        else:
-            cursor.execute("SELECT id, username, role, group_name FROM users")
+        cursor.execute("SELECT id, username, role, group_name FROM users")
         return cursor.fetchall()
     finally:
         conn.close()
 
-def add_user(username, password, role, group_name=None, break_templates=None):
+def add_user(username, password, role, group_name=None):
     if is_killswitch_enabled():
         st.error("System is currently locked. Please contact the developer.")
         return False
@@ -584,35 +543,19 @@ def add_user(username, password, role, group_name=None, break_templates=None):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        # MIGRATION: Add break_templates column if not exists
-        try:
-            cursor.execute("ALTER TABLE users ADD COLUMN break_templates TEXT")
-        except Exception:
-            pass
         try:
             if group_name is not None:
-                if break_templates is not None:
-                    break_templates_str = ','.join(break_templates) if isinstance(break_templates, list) else str(break_templates)
-                    cursor.execute("INSERT INTO users (username, password, role, group_name, break_templates) VALUES (?, ?, ?, ?, ?)",
-                                   (username, hash_password(password), role, group_name, break_templates_str))
-                else:
-                    cursor.execute("INSERT INTO users (username, password, role, group_name) VALUES (?, ?, ?, ?)",
-                                   (username, hash_password(password), role, group_name))
+                cursor.execute("INSERT INTO users (username, password, role, group_name) VALUES (?, ?, ?, ?)",
+                               (username, hash_password(password), role, group_name))
             else:
-                if break_templates is not None:
-                    break_templates_str = ','.join(break_templates) if isinstance(break_templates, list) else str(break_templates)
-                    cursor.execute("INSERT INTO users (username, password, role, break_templates) VALUES (?, ?, ?, ?)",
-                                   (username, hash_password(password), role, break_templates_str))
-                else:
-                    cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                                   (username, hash_password(password), role))
+                cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                               (username, hash_password(password), role))
             conn.commit()
             return True
         except sqlite3.IntegrityError:
             return "exists"
     finally:
         conn.close()
-
 
 def delete_user(user_id):
     if is_killswitch_enabled():
@@ -1378,20 +1321,12 @@ def admin_break_dashboard():
                         template_name = breaks[break_type].get('template', 'Unknown')
                         break
                 
-                # Find a single 'booked_at' value for this agent's booking
-                booked_at = None
-                for btype in ['lunch', 'early_tea', 'late_tea']:
-                    if btype in breaks and isinstance(breaks[btype], dict):
-                        booked_at = breaks[btype].get('booked_at', None)
-                        if booked_at:
-                            break
                 booking = {
                     "Agent": agent,
                     "Template": template_name or "Unknown",
                     "Lunch": breaks.get("lunch", {}).get("time", "-") if isinstance(breaks.get("lunch"), dict) else breaks.get("lunch", "-"),
                     "Early Tea": breaks.get("early_tea", {}).get("time", "-") if isinstance(breaks.get("early_tea"), dict) else breaks.get("early_tea", "-"),
-                    "Late Tea": breaks.get("late_tea", {}).get("time", "-") if isinstance(breaks.get("late_tea"), dict) else breaks.get("late_tea", "-"),
-                    "Booked At": booked_at or "-"
+                    "Late Tea": breaks.get("late_tea", {}).get("time", "-") if isinstance(breaks.get("late_tea"), dict) else breaks.get("late_tea", "-")
                 }
                 bookings_data.append(booking)
             
@@ -1474,27 +1409,8 @@ def agent_break_dashboard():
         st.session_state.selected_template_name = None
     
     agent_id = st.session_state.username
-    morocco_tz = pytz.timezone('Africa/Casablanca')
-    now_casa = datetime.now(morocco_tz)
-    casa_date = now_casa.strftime('%Y-%m-%d')
-    current_date = casa_date  # Use Casablanca date for all booking logic
-
-    # Only apply auto-clear for agents (not admin/qa)
-    user_role = st.session_state.get('role', 'agent')
-    if user_role == 'agent':
-        # Track last clear per agent
-        if 'last_booking_clear_per_agent' not in st.session_state:
-            st.session_state.last_booking_clear_per_agent = {}
-        last_clear = st.session_state.last_booking_clear_per_agent.get(agent_id)
-        # Clear after 11:59 AM
-        if (now_casa.hour > 11 or (now_casa.hour == 11 and now_casa.minute >= 59)):
-            if last_clear != casa_date:
-                # Clear only this agent's bookings for today
-                if current_date in st.session_state.agent_bookings:
-                    st.session_state.agent_bookings[current_date].pop(agent_id, None)
-                st.session_state.last_booking_clear_per_agent[agent_id] = casa_date
-                save_break_data()
-
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    
     # Check if agent already has confirmed bookings
     has_confirmed_bookings = (
         current_date in st.session_state.agent_bookings and 
@@ -1514,15 +1430,6 @@ def agent_break_dashboard():
         if template_name:
             st.info(f"Template: **{template_name}**")
         
-        # Find a single 'booked_at' value to display (first found among breaks)
-        booked_at = None
-        for break_type in ['lunch', 'early_tea', 'late_tea']:
-            if break_type in bookings and isinstance(bookings[break_type], dict):
-                booked_at = bookings[break_type].get('booked_at', None)
-                if booked_at:
-                    break
-        if booked_at:
-            st.caption(f"Booked at: {booked_at}")
         for break_type, display_name in [
             ("lunch", "Lunch Break"),
             ("early_tea", "Early Tea Break"),
@@ -1535,57 +1442,28 @@ def agent_break_dashboard():
                     st.write(f"**{display_name}:** {bookings[break_type]}")
         return
     
-    # Determine agent's assigned templates
-    agent_templates = []
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        # Defensive: Check if break_templates column exists
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "break_templates" in columns:
-            cursor.execute("SELECT break_templates FROM users WHERE username = ?", (agent_id,))
-            row = cursor.fetchone()
-            if row and row[0]:
-                agent_templates = [t.strip() for t in row[0].split(',') if t.strip()]
-    except Exception:
-        agent_templates = []
-    finally:
-        try:
-            conn.close()
-        except:
-            pass
-
     # Step 1: Template Selection
     if not st.session_state.selected_template_name:
         st.subheader("Step 1: Select Break Schedule")
-        # Only show templates the agent is assigned to
-        available_templates = [t for t in st.session_state.active_templates if t in agent_templates] if agent_templates else []
-        if not available_templates or not agent_templates:
-            st.error("You are not assigned to any break schedule. Please contact your administrator.")
-            return  # Absolutely enforce early return
-        if len(available_templates) == 1:
-            # Only one template, auto-select
-            st.session_state.selected_template_name = available_templates[0]
-            st.rerun()
-        else:
-            selected_template = st.selectbox(
-                "Choose your break schedule:",
-                available_templates,
-                index=None,
-                placeholder="Select a template..."
-            )
-            if selected_template:
-                if st.button("Continue to Break Selection"):
-                    st.session_state.selected_template_name = selected_template
-                    st.rerun()
-            return  # Absolutely enforce early return
-
+        available_templates = st.session_state.active_templates
+        if not available_templates:
+            st.error("No break schedules available. Please contact admin.")
+            return
+        
+        selected_template = st.selectbox(
+            "Choose your break schedule:",
+            available_templates,
+            index=None,
+            placeholder="Select a template..."
+        )
+        
+        if selected_template:
+            if st.button("Continue to Break Selection"):
+                st.session_state.selected_template_name = selected_template
+                st.rerun()
+        return
     
     # Step 2: Break Selection
-    if st.session_state.selected_template_name not in st.session_state.templates:
-        st.error("Your assigned break schedule is not available. Please contact your administrator.")
-        return
     template = st.session_state.templates[st.session_state.selected_template_name]
     
     st.subheader("Step 2: Select Your Breaks")
@@ -2539,8 +2417,8 @@ else:
         welcome_color = '#1e293b' if st.session_state.get('color_mode', 'light') == 'light' else '#fff'
         # Format username for welcome message
         username_display = st.session_state.username
-        if username_display.lower() == "Taha kirri":
-            username_display = "Taha Kirri ⚙️"
+        if username_display.lower() == "amal hichy":
+            username_display = "Amal Hichy ❤️"
         else:
             username_display = username_display.title()
         st.markdown(f'<h2 style="color: {welcome_color};">✨ Welcome, {username_display}</h2>', unsafe_allow_html=True)
@@ -3059,12 +2937,11 @@ else:
             with col1:
                 search_query = st.text_input("🔍 Search late login records...", key="late_login_search")
             with col2:
-                start_date = st.date_input("Start date", key="late_login_start_date")
-                end_date = st.date_input("End date", key="late_login_end_date")
-
-            # Filtering logic
-            if search_query or start_date or end_date:
+                date_filter = st.date_input("📅 Filter by date (Casablanca time)", key="late_login_date")
+            
+            if search_query or date_filter:
                 filtered_logins = []
+                
                 for login in late_logins:
                     matches_search = True
                     matches_date = True
@@ -3077,21 +2954,16 @@ else:
                             search_query in login[3]     # Login time
                         )
                     
-                    if start_date and end_date:
+                    if date_filter:
                         try:
                             record_date = datetime.strptime(login[5], "%Y-%m-%d %H:%M:%S").date()
-                            matches_date = start_date <= record_date <= end_date
+                            matches_date = record_date == date_filter
                         except:
                             matches_date = False
-                    elif start_date:
-                        try:
-                            record_date = datetime.strptime(login[5], "%Y-%m-%d %H:%M:%S").date()
-                            matches_date = record_date == start_date
-                        except:
-                            matches_date = False
-                    # else: no date filter
+                    
                     if matches_search and matches_date:
                         filtered_logins.append(login)
+                
                 late_logins = filtered_logins
             
             if late_logins:
@@ -3108,18 +2980,12 @@ else:
                 
                 df = pd.DataFrame(data)
                 st.dataframe(df)
+                
                 csv = df.to_csv(index=False).encode('utf-8')
-                # File name logic
-                if start_date and end_date:
-                    fname = f"late_logins_{start_date}_to_{end_date}.csv"
-                elif start_date:
-                    fname = f"late_logins_{start_date}.csv"
-                else:
-                    fname = "late_logins_all.csv"
                 st.download_button(
                     label="Download as CSV",
                     data=csv,
-                    file_name=fname,
+                    file_name=f"late_logins_{date_filter.strftime('%Y-%m-%d') if date_filter else 'all'}.csv",
                     mime="text/csv"
                 )
                 
@@ -3160,6 +3026,48 @@ else:
                 st.dataframe(df)
             else:
                 st.info("You have no late login records")
+
+    elif st.session_state.current_section == "fancy_number":
+        st.subheader("💎 Fancy Number Checker")
+        
+        # Input for phone number
+        phone_number = st.text_input("Enter Phone Number", placeholder="e.g. +1 (123) 456-7890")
+        
+        # Check button
+        if st.button("Check Fancy Number"):
+            if phone_number:
+                # Clean the phone number
+                cleaned_number = re.sub(r'\D', '', phone_number)
+                
+                # Check if the last 6 digits form a fancy pattern
+                if len(cleaned_number) >= 6:
+                    last_six_digits = cleaned_number[-6:]
+                    
+                    # Check for various fancy patterns
+                    is_fancy = (
+                        # Repeating digits
+                        len(set(last_six_digits)) <= 2 or
+                        
+                        # Sequential digits
+                        last_six_digits in ['123456', '234567', '345678', '456789', '567890'] or
+                        last_six_digits in ['654321', '543210', '432109', '321098', '210987'] or
+                        
+                        # Palindrome
+                        last_six_digits == last_six_digits[::-1] or
+                        
+                        # Special patterns
+                        last_six_digits in ['111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999'] or
+                        last_six_digits in ['112233', '223344', '334455', '445566', '556677', '667788', '778899']
+                    )
+                    
+                    if is_fancy:
+                        st.success(f"🎉 Fancy Number Found! The last 6 digits ({last_six_digits}) form a fancy pattern.")
+                    else:
+                        st.info(f"🔍 Not a Fancy Number. The last 6 digits ({last_six_digits}) do not form a special pattern.")
+                else:
+                    st.warning("Please enter a valid phone number with at least 6 digits.")
+            else:
+                st.warning("Please enter a phone number.")
 
     elif st.session_state.current_section == "quality_issues":
         st.subheader("📞 Quality Related Technical Issue")
@@ -3218,12 +3126,11 @@ else:
             with col1:
                 search_query = st.text_input("🔍 Search quality issues...", key="quality_issues_search")
             with col2:
-                start_date = st.date_input("Start date", key="quality_issues_start_date")
-                end_date = st.date_input("End date", key="quality_issues_end_date")
-
-            # Filtering logic
-            if search_query or start_date or end_date:
+                date_filter = st.date_input("📅 Filter by date (Casablanca time)", key="quality_issues_date")
+            
+            if search_query or date_filter:
                 filtered_issues = []
+                
                 for issue in quality_issues:
                     matches_search = True
                     matches_date = True
@@ -3237,21 +3144,16 @@ else:
                             search_query.lower() in issue[5].lower()  # Product
                         )
                     
-                    if start_date and end_date:
+                    if date_filter:
                         try:
                             record_date = datetime.strptime(issue[6], "%Y-%m-%d %H:%M:%S").date()
-                            matches_date = start_date <= record_date <= end_date
+                            matches_date = record_date == date_filter
                         except:
                             matches_date = False
-                    elif start_date:
-                        try:
-                            record_date = datetime.strptime(issue[6], "%Y-%m-%d %H:%M:%S").date()
-                            matches_date = record_date == start_date
-                        except:
-                            matches_date = False
-                    # else: no date filter
+                    
                     if matches_search and matches_date:
                         filtered_issues.append(issue)
+                
                 quality_issues = filtered_issues
             
             if quality_issues:
@@ -3269,18 +3171,12 @@ else:
                 
                 df = pd.DataFrame(data)
                 st.dataframe(df)
+                
                 csv = df.to_csv(index=False).encode('utf-8')
-                # File name logic
-                if start_date and end_date:
-                    fname = f"quality_issues_{start_date}_to_{end_date}.csv"
-                elif start_date:
-                    fname = f"quality_issues_{start_date}.csv"
-                else:
-                    fname = "quality_issues_all.csv"
                 st.download_button(
                     label="Download as CSV",
                     data=csv,
-                    file_name=fname,
+                    file_name=f"quality_issues_{date_filter.strftime('%Y-%m-%d') if date_filter else 'all'}.csv",
                     mime="text/csv"
                 )
                 
@@ -3363,12 +3259,11 @@ else:
             with col1:
                 search_query = st.text_input("🔍 Search mid-shift issues...", key="midshift_issues_search")
             with col2:
-                start_date = st.date_input("Start date", key="midshift_issues_start_date")
-                end_date = st.date_input("End date", key="midshift_issues_end_date")
-
-            # Filtering logic
-            if search_query or start_date or end_date:
+                date_filter = st.date_input("📅 Filter by date (Casablanca time)", key="midshift_issues_date")
+            
+            if search_query or date_filter:
                 filtered_issues = []
+                
                 for issue in midshift_issues:
                     matches_search = True
                     matches_date = True
@@ -3381,21 +3276,16 @@ else:
                             search_query in issue[4]     # End time
                         )
                     
-                    if start_date and end_date:
+                    if date_filter:
                         try:
                             record_date = datetime.strptime(issue[5], "%Y-%m-%d %H:%M:%S").date()
-                            matches_date = start_date <= record_date <= end_date
+                            matches_date = record_date == date_filter
                         except:
                             matches_date = False
-                    elif start_date:
-                        try:
-                            record_date = datetime.strptime(issue[5], "%Y-%m-%d %H:%M:%S").date()
-                            matches_date = record_date == start_date
-                        except:
-                            matches_date = False
-                    # else: no date filter
+                    
                     if matches_search and matches_date:
                         filtered_issues.append(issue)
+                
                 midshift_issues = filtered_issues
             
             if midshift_issues:
@@ -3412,18 +3302,12 @@ else:
                 
                 df = pd.DataFrame(data)
                 st.dataframe(df)
+                
                 csv = df.to_csv(index=False).encode('utf-8')
-                # File name logic
-                if start_date and end_date:
-                    fname = f"midshift_issues_{start_date}_to_{end_date}.csv"
-                elif start_date:
-                    fname = f"midshift_issues_{start_date}.csv"
-                else:
-                    fname = "midshift_issues_all.csv"
                 st.download_button(
                     label="Download as CSV",
                     data=csv,
-                    file_name=fname,
+                    file_name=f"midshift_issues_{date_filter.strftime('%Y-%m-%d') if date_filter else 'all'}.csv",
                     mime="text/csv"
                 )
                 
@@ -3597,28 +3481,6 @@ else:
                     st.info("Note: New accounts will be created as agent accounts.")
                 # Group selection for all new users
                 group_name = st.text_input("Group Name (required)")
-
-                # --- Break Templates Selection for Agents ---
-                selected_templates = []
-                if role == "agent":
-                    # Load templates from templates.json
-                    templates = []
-                    try:
-                        with open("templates.json", "r") as f:
-                            templates = list(json.load(f).keys())
-                    except Exception:
-                        st.warning("No break templates found. Please add templates.json.")
-                    if templates:
-                        selected_templates = st.multiselect(
-                            "Select break templates agent can book from:",
-                            templates,
-                            help="Choose one or more break templates for this agent"
-                        )
-                    else:
-                        selected_templates = []
-                else:
-                    selected_templates = []
-
                 if st.form_submit_button("Add User"):
                     def is_password_complex(password):
                         if len(password) < 8:
@@ -3637,8 +3499,7 @@ else:
                         if not is_password_complex(pwd):
                             st.error("Password must be at least 8 characters, include uppercase, lowercase, digit, and special character.")
                         else:
-                            # Pass selected_templates for agent, or empty for admin
-                            result = add_user(user, pwd, role, group_name, selected_templates)
+                            result = add_user(user, pwd, role, group_name)
                             if result == "exists":
                                 st.error("User already exists. Please choose a different username.")
                             elif result:
@@ -3646,7 +3507,6 @@ else:
                                 st.rerun()
                             else:
                                 st.error("Failed to add user. Please try again.")
-
                     elif not group_name:
                         st.error("Group name is required.")
         
@@ -3767,57 +3627,6 @@ else:
             # Agents view
             agent_users = [user for user in users if user[2] == "agent"]
             st.write(f"### Agent Users ({len(agent_users)})")
-
-            # --- Admin: Show agent to template assignments ---
-            if st.session_state.role == "admin":
-                st.subheader("Agent Break Template Assignments")
-                agent_templates = get_all_users(include_templates=True)
-                templates_list = []
-                try:
-                    with open("templates.json", "r") as f:
-                        templates_list = list(json.load(f).keys())
-                except Exception:
-                    st.warning("No break templates found. Please add templates.json.")
-
-                # --- Refactored: Single agent dropdown ---
-                agent_choices = [(u[1], u[3]) for u in agent_templates if u[2] == "agent"]
-                agent_labels = [f"{name} ({group})" if group else name for name, group in agent_choices]
-                agent_usernames = [name for name, _ in agent_choices]
-                if not agent_labels:
-                    st.info("No agents found or no agents assigned to any templates yet.")
-                else:
-                    selected_idx = st.selectbox("Select agent to edit templates:", options=list(range(len(agent_labels))), format_func=lambda i: agent_labels[i] if i is not None else "Select...", key="admin_agent_select")
-                    if selected_idx is not None:
-                        username = agent_usernames[selected_idx]
-                        # Get current templates
-                        agent_row = next(u for u in agent_templates if u[1] == username)
-                        current_templates = [t.strip() for t in (agent_row[4] or '').split(',') if t.strip()]
-                        st.write(f"**Editing templates for:** {username}")
-                        new_templates = st.multiselect(
-                            f"Edit templates for {username}",
-                            templates_list,
-                            default=current_templates,
-                            key=f"edit_templates_{username}"
-                        )
-                        if st.button(f"Save for {username}", key=f"save_templates_{username}"):
-                            def update_agent_templates(username, templates):
-                                conn = sqlite3.connect("data/requests.db")
-                                try:
-                                    cursor = conn.cursor()
-                                    templates_str = ','.join(templates)
-                                    cursor.execute(
-                                        "UPDATE users SET break_templates = ? WHERE username = ?",
-                                        (templates_str, username)
-                                    )
-                                    conn.commit()
-                                    return True
-                                finally:
-                                    conn.close()
-                            update_agent_templates(username, new_templates)
-                            st.success(f"Templates updated for {username}!")
-                            st.rerun()
-
-
             
             agent_data = []
             for uid, uname, urole, gname in agent_users:
