@@ -526,9 +526,25 @@ def get_group_messages(group_name=None):
         conn.close()
 
 def add_reaction_to_message(message_id, emoji, username):
-    # This function is now disabled as emoji reactions are removed
-    return False
-
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT reactions FROM group_messages WHERE id = ?", (message_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        reactions = json.loads(row[0]) if row[0] else {}
+        if emoji not in reactions:
+            reactions[emoji] = []
+        if username in reactions[emoji]:
+            reactions[emoji].remove(username)  # Toggle off
+            if not reactions[emoji]:
+                del reactions[emoji]
+        else:
+            reactions[emoji].append(username)
+        cursor.execute("UPDATE group_messages SET reactions = ? WHERE id = ?", (json.dumps(reactions), message_id))
+        conn.commit()
+        return True
     finally:
         conn.close()
 
@@ -2870,28 +2886,36 @@ else:
                 st.markdown('</div>', unsafe_allow_html=True)
 
                 # Emoji picker for chat input
-             with st.form("chat_form", clear_on_submit=True):
-    message = st.text_input("Type your message...", key="chat_input")
-    col1, col2 = st.columns([5, 1])
-    with col2:
-        if st.form_submit_button("Send"):
-            if message:
-                # Admin: send to selected group; Agent: always look up group from users table
-                if st.session_state.role == "admin":
-                    send_to_group = group_filter
-                else:
-                    # Always look up the user's group from the users table
-                    send_to_group = None
-                    for u in get_all_users():
-                        if u[1] == st.session_state.username:
-                            send_to_group = u[3]
-                            break
-                if send_to_group:
-                    send_group_message(st.session_state.username, message, send_to_group)
-                else:
-                    st.warning("No group selected for chat.")
-                st.rerun()
-
+                emoji_choices = ["👍", "😂", "😍", "😮", "😢", "👎"]
+                st.markdown("<div style='margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
+                emoji_cols = st.columns(len(emoji_choices))
+                for i, emoji in enumerate(emoji_choices):
+                    if emoji_cols[i].button(emoji, key=f"emoji_picker_{emoji}"):
+                        if 'chat_input' not in st.session_state:
+                            st.session_state['chat_input'] = ''
+                        st.session_state['chat_input'] += emoji
+                st.markdown("</div>", unsafe_allow_html=True)
+                with st.form("chat_form", clear_on_submit=True):
+                    message = st.text_input("Type your message...", key="chat_input")
+                    col1, col2 = st.columns([5,1])
+                    with col2:
+                        if st.form_submit_button("Send"):
+                            if message:
+                                # Admin: send to selected group; Agent: always look up group from users table
+                                if st.session_state.role == "admin":
+                                    send_to_group = group_filter
+                                else:
+                                    # Always look up the user's group from the users table
+                                    send_to_group = None
+                                    for u in get_all_users():
+                                        if u[1] == st.session_state.username:
+                                            send_to_group = u[3]
+                                            break
+                                if send_to_group:
+                                    send_group_message(st.session_state.username, message, send_to_group)
+                                else:
+                                    st.warning("No group selected for chat.")
+                                st.rerun()
         else:
             st.error("System is currently locked. Access to chat is disabled.")
 
