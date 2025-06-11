@@ -2886,35 +2886,28 @@ else:
                 st.markdown('</div>', unsafe_allow_html=True)
 
                 # Emoji picker for chat input
-                emoji_choices = ["👍", "😂", "😍", "😮", "😢", "👎"]
-                st.markdown("<div style='margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
-                for i, emoji in enumerate(emoji_choices):
-                    if emoji_cols[i].button(emoji, key=f"emoji_picker_{emoji}"):
-                        if 'chat_input' not in st.session_state:
-                            st.session_state['chat_input'] = ''
-                        st.session_state['chat_input'] += emoji
-                st.markdown("</div>", unsafe_allow_html=True)
-                with st.form("chat_form", clear_on_submit=True):
-                    message = st.text_input("Type your message...", key="chat_input")
-                    col1, col2 = st.columns([5,1])
-                    with col2:
-                        if st.form_submit_button("Send"):
-                            if message:
-                                # Admin: send to selected group; Agent: always look up group from users table
-                                if st.session_state.role == "admin":
-                                    send_to_group = group_filter
-                                else:
-                                    # Always look up the user's group from the users table
-                                    send_to_group = None
-                                    for u in get_all_users():
-                                        if u[1] == st.session_state.username:
-                                            send_to_group = u[3]
-                                            break
-                                if send_to_group:
-                                    send_group_message(st.session_state.username, message, send_to_group)
-                                else:
-                                    st.warning("No group selected for chat.")
-                                st.rerun()
+             with st.form("chat_form", clear_on_submit=True):
+    message = st.text_input("Type your message...", key="chat_input")
+    col1, col2 = st.columns([5, 1])
+    with col2:
+        if st.form_submit_button("Send"):
+            if message:
+                # Admin: send to selected group; Agent: always look up group from users table
+                if st.session_state.role == "admin":
+                    send_to_group = group_filter
+                else:
+                    # Always look up the user's group from the users table
+                    send_to_group = None
+                    for u in get_all_users():
+                        if u[1] == st.session_state.username:
+                            send_to_group = u[3]
+                            break
+                if send_to_group:
+                    send_group_message(st.session_state.username, message, send_to_group)
+                else:
+                    st.warning("No group selected for chat.")
+                st.rerun()
+
         else:
             st.error("System is currently locked. Access to chat is disabled.")
 
