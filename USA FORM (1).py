@@ -22,13 +22,7 @@ def ensure_break_templates_column():
         columns = [row[1] for row in cursor.fetchall()]
         if "break_templates" not in columns:
             try:
-                cursor.execute("ALTER TABLE users ADD COLUMN brea# Check existing users
-                conn = sqlite3.connect("data/requests.db")
-                cursor = conn.cursor()
-                cursor.execute("SELECT username FROM users")
-                existing_users = cursor.fetchall()
-                print("Existing users:", existing_users)
-                conn.close()k_templates TEXT")
+                cursor.execute("ALTER TABLE users ADD COLUMN break_templates TEXT")
                 conn.commit()
             except Exception:
                 pass
@@ -570,6 +564,7 @@ def add_user(username, password, role, group_name=None, break_templates=None):
     if is_killswitch_enabled():
         st.error("System is currently locked. Please contact the developer.")
         return False
+
     # Password complexity check (defense-in-depth)
     def is_password_complex(password):
         if len(password) < 8:
@@ -583,18 +578,28 @@ def add_user(username, password, role, group_name=None, break_templates=None):
         if not re.search(r"[^A-Za-z0-9]", password):
             return False
         return True
+
     if not is_password_complex(password):
         st.error("Password must be at least 8 characters, include uppercase, lowercase, digit, and special character.")
         return False
+
     import sqlite3
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+
+        # Check if username already exists
+        cursor.execute("SELECT 1 FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+        if cursor.fetchone():
+            st.error("Username already exists. Please choose a different username.")
+            return False
+
         # MIGRATION: Add break_templates column if not exists
         try:
             cursor.execute("ALTER TABLE users ADD COLUMN break_templates TEXT")
         except Exception:
             pass
+
         try:
             if group_name is not None:
                 if break_templates is not None:
