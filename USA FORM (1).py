@@ -2886,9 +2886,7 @@ else:
                 st.markdown('</div>', unsafe_allow_html=True)
 
                 # Emoji picker for chat input
-              emoji_choices = ["👍", "😂", "😍", "😮", "😢", "👎"]
-st.markdown("<div style='margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
-emoji_cols = st.columns(len(emoji_choices))
+         
 
 for i, emoji in enumerate(emoji_choices):
     if emoji_cols[i].button(emoji, key=f"emoji_picker_{emoji}"):
