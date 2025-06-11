@@ -2886,21 +2886,23 @@ else:
                 st.markdown('</div>', unsafe_allow_html=True)
 
                 # Emoji picker for chat input
-                emoji_choices = ["👍", "😂", "😍", "😮", "😢", "👎"]
-                st.markdown("<div style='margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
-                emoji_cols = st.columns(len(emoji_choices))
-                for i, emoji in enumerate(emoji_choices):
-                    if emoji_cols[i].button(emoji, key=f"emoji_picker_{emoji}"):
-                        if 'chat_input' not in st.session_state:
-                            st.session_state['chat_input'] = ''
-                        st.session_state['chat_input'] += emoji
-                st.markdown("</div>", unsafe_allow_html=True)
-                with st.form("chat_form", clear_on_submit=True):
-                    message = st.text_input("Type your message...", key="chat_input")
-                    col1, col2 = st.columns([5,1])
-                    with col2:
-                        if st.form_submit_button("Send"):
-                            if message:
+              emoji_choices = ["👍", "😂", "😍", "😮", "😢", "👎"]
+st.markdown("<div style='margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
+emoji_cols = st.columns(len(emoji_choices))
+
+for i, emoji in enumerate(emoji_choices):
+    if emoji_cols[i].button(emoji, key=f"emoji_picker_{emoji}"):
+        # Always replace the chat input with just the emoji
+        st.session_state['chat_input'] = emoji
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+with st.form("chat_form", clear_on_submit=True):
+    message = st.text_input("Type your message...", key="chat_input")
+    col1, col2 = st.columns([5, 1])
+    with col2:
+        if st.form_submit_button("Send"):
+            if message:
                                 # Admin: send to selected group; Agent: always look up group from users table
                                 if st.session_state.role == "admin":
                                     send_to_group = group_filter
