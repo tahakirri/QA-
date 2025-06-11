@@ -2058,7 +2058,7 @@ def inject_custom_css():
         /* Button Styling */
         .stButton > button {{
             background-color: {c['button_bg']} !important;
-            color: {c['button_text']} !important;
+            color: #ffffff !important;
             border: none !important;
             border-radius: 1rem !important;
             padding: 0.5rem 1rem !important;
@@ -2342,8 +2342,8 @@ def inject_custom_css():
         button[data-testid="baseButton-secondary"]:hover,
         .stButton > button:hover {{    
             background-color: {c['button_hover']} !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }}
         
         /* Secondary Buttons */
@@ -2363,8 +2363,8 @@ def inject_custom_css():
         button[data-testid="baseButton-secondary"]:hover,
         div[data-baseweb="button"]:hover {{    
             background-color: {c['button_hover']} !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }}
         
         /* VIP Button */
@@ -2380,7 +2380,7 @@ def inject_custom_css():
         
         .vip-button:hover {{    
             background-color: {c['accent_hover']} !important;
-            transform: translateY(-1px) !important;
+            transform: translateY(-1px);
         }}
         
         /* Checkbox Styling */
@@ -2550,7 +2550,7 @@ else:
         welcome_color = '#1e293b' if st.session_state.get('color_mode', 'light') == 'light' else '#fff'
         # Format username for welcome message
         username_display = st.session_state.username
-        if username_display.lower() == "Taha kirri":
+        if username_display.lower() == "taha kirri":
             username_display = "Taha Kirri ⚙️"
         else:
             username_display = username_display.title()
@@ -3619,214 +3619,44 @@ else:
                             templates = list(json.load(f).keys())
                     except Exception:
                         st.warning("No break templates found. Please add templates.json.")
-                    if templates:
-                        selected_templates = st.multiselect(
-                            "Select break templates agent can book from:",
-                            templates,
-                            help="Choose one or more break templates for this agent"
-                        )
+
+                    # --- Refactored: Single agent dropdown ---
+                    agent_choices = [(u[1], u[3]) for u in get_all_users() if u[2] == "agent"]
+                    agent_labels = [f"{name} ({group})" if group else name for name, group in agent_choices]
+                    agent_usernames = [name for name, _ in agent_choices]
+                    if not agent_labels:
+                        st.info("No agents found or no agents assigned to any templates yet.")
                     else:
-                        selected_templates = []
-                else:
-                    selected_templates = []
-
-                if st.form_submit_button("Add User"):
-                    def is_password_complex(password):
-                        if len(password) < 8:
-                            return False
-                        if not re.search(r"[A-Z]", password):
-                            return False
-                        if not re.search(r"[a-z]", password):
-                            return False
-                        if not re.search(r"[0-9]", password):
-                            return False
-                        if not re.search(r"[^A-Za-z0-9]", password):
-                            return False
-                        return True
-
-                    if user and pwd and group_name:
-                        if not is_password_complex(pwd):
-                            st.error("Password must be at least 8 characters, include uppercase, lowercase, digit, and special character.")
-                        else:
-                            # Pass selected_templates for agent, or empty for admin
-                            result = add_user(user, pwd, role, group_name, selected_templates)
-                            if result == "exists":
-                                st.error("User already exists. Please choose a different username.")
-                            elif result:
-                                st.success("User added successfully!")
+                        selected_idx = st.selectbox("Select agent to edit templates:", options=list(range(len(agent_labels))), format_func=lambda i: agent_labels[i] if i is not None else "Select...", key="admin_agent_select")
+                        if selected_idx is not None:
+                            username = agent_usernames[selected_idx]
+                            # Get current templates
+                            agent_row = next(u for u in get_all_users() if u[1] == username)
+                            current_templates = [t.strip() for t in (agent_row[4] or '').split(',') if t.strip()]
+                            st.write(f"**Editing templates for:** {username}")
+                            new_templates = st.multiselect(
+                                f"Edit templates for {username}",
+                                templates,
+                                default=current_templates,
+                                key=f"edit_templates_{username}"
+                            )
+                            if st.button(f"Save for {username}", key=f"save_templates_{username}"):
+                                def update_agent_templates(username, templates):
+                                    conn = sqlite3.connect("data/requests.db")
+                                    try:
+                                        cursor = conn.cursor()
+                                        templates_str = ','.join(templates)
+                                        cursor.execute(
+                                            "UPDATE users SET break_templates = ? WHERE username = ?",
+                                            (templates_str, username)
+                                        )
+                                        conn.commit()
+                                        return True
+                                    finally:
+                                        conn.close()
+                                update_agent_templates(username, new_templates)
+                                st.success(f"Templates updated for {username}!")
                                 st.rerun()
-                            else:
-                                st.error("Failed to add user. Please try again.")
-
-                    elif not group_name:
-                        st.error("Group name is required.")
-        
-        st.subheader("Existing Users")
-        users = get_all_users()
-        
-        # Create tabs for different user types
-        user_tabs = st.tabs(["All Users", "Admins", "Agents", "QA"])
-        
-        # Password reset for admin
-        if st.session_state.role == "admin":
-            st.write("### Reset User Password")
-            with st.form("reset_password_form"):
-                reset_user = st.selectbox("Select User", [u[1] for u in users], key="reset_user_select")
-                new_pwd = st.text_input("New Password", type="password", key="reset_user_pwd")
-                if st.form_submit_button("Reset Password"):
-                    def is_password_complex(password):
-                        if len(password) < 8:
-                            return False
-                        if not re.search(r"[A-Z]", password):
-                            return False
-                        if not re.search(r"[a-z]", password):
-                            return False
-                        if not re.search(r"[0-9]", password):
-                            return False
-                        if not re.search(r"[^A-Za-z0-9]", password):
-                            return False
-                        return True
-                    if reset_user and new_pwd:
-                        if reset_user.lower() == "taha kirri":
-                            st.error("You cannot reset the password for the 'taha kirri' account.")
-                        elif not is_password_complex(new_pwd):
-                            st.error("Password must be at least 8 characters, include uppercase, lowercase, digit, and special character.")
-                        else:
-                            reset_password(reset_user, new_pwd)
-                            st.success(f"Password reset for {reset_user}")
-                            st.rerun()
-        # Group editing for admin
-        if st.session_state.username.lower() == "taha kirri":
-            st.write("### Change Agent Group")
-            agent_users = [user for user in users if user[2] == "agent"]
-            if agent_users:
-                agent_names = [f"{u[1]} (Current: {u[3]})" for u in agent_users]
-                selected_agent = st.selectbox("Select Agent", agent_names, key="edit_agent_group")
-                new_group = st.text_input("New Group Name", key="edit_group_name")
-                if st.button("Change Group"):
-                    agent_id = agent_users[agent_names.index(selected_agent)][0]
-                    # Update group in DB
-                    conn = get_db_connection()
-                    try:
-                        cursor = conn.cursor()
-                        cursor.execute("UPDATE users SET group_name = ? WHERE id = ?", (new_group, agent_id))
-                        conn.commit()
-                        st.success("Group updated!")
-                        st.rerun()
-                    finally:
-                        conn.close()
-        
-        with user_tabs[0]:
-            # All users view
-            st.write("### All Users")
-            
-            # Create a dataframe for better display
-            user_data = []
-            for uid, uname, urole, gname in users:
-                user_data.append({
-                    "ID": uid,
-                    "Username": uname,
-                    "Role": urole,
-                    "Group": gname
-                })
-            
-            df = pd.DataFrame(user_data)
-            st.dataframe(df, use_container_width=True)
-            
-            # User deletion with dropdown
-            if st.session_state.username.lower() == "taha kirri":
-                # Taha can delete any user
-                with st.form("delete_user_form"):
-                    st.write("### Delete User")
-                    user_to_delete = st.selectbox(
-                        "Select User to Delete",
-                        [f"{user[0]} - {user[1]} ({user[2]})" for user in users],
-                        key="delete_user_select"
-                    )
-                    
-                    confirm_delete_user = st.checkbox("I understand and want to delete this user")
-                    if st.form_submit_button("Delete User") and not is_killswitch_enabled():
-                        if confirm_delete_user:
-                            user_id = int(user_to_delete.split(' - ')[0])
-                            if delete_user(user_id):
-                                st.success(f"User deleted successfully!")
-                                st.rerun()
-                            else:
-                                st.error("Failed to delete user.")
-                        else:
-                            st.warning("Please confirm by checking the checkbox.")
-        
-        with user_tabs[1]:
-            # Admins view
-            admin_users = [user for user in users if user[2] == "admin"]
-            st.write(f"### Admin Users ({len(admin_users)})")
-            
-            admin_data = []
-            for uid, uname, urole, gname in admin_users:
-                admin_data.append({
-                    "ID": uid,
-                    "Username": uname,
-                    "Group": gname
-                })
-            
-            if admin_data:
-                st.dataframe(pd.DataFrame(admin_data), use_container_width=True)
-            else:
-                st.info("No admin users found")
-        
-        with user_tabs[2]:
-            # Agents view
-            agent_users = [user for user in users if user[2] == "agent"]
-            st.write(f"### Agent Users ({len(agent_users)})")
-
-            # --- Admin: Show agent to template assignments ---
-            if st.session_state.role == "admin":
-                st.subheader("Agent Break Template Assignments")
-                agent_templates = get_all_users(include_templates=True)
-                templates_list = []
-                try:
-                    with open("templates.json", "r") as f:
-                        templates_list = list(json.load(f).keys())
-                except Exception:
-                    st.warning("No break templates found. Please add templates.json.")
-
-                # --- Refactored: Single agent dropdown ---
-                agent_choices = [(u[1], u[3]) for u in agent_templates if u[2] == "agent"]
-                agent_labels = [f"{name} ({group})" if group else name for name, group in agent_choices]
-                agent_usernames = [name for name, _ in agent_choices]
-                if not agent_labels:
-                    st.info("No agents found or no agents assigned to any templates yet.")
-                else:
-                    selected_idx = st.selectbox("Select agent to edit templates:", options=list(range(len(agent_labels))), format_func=lambda i: agent_labels[i] if i is not None else "Select...", key="admin_agent_select")
-                    if selected_idx is not None:
-                        username = agent_usernames[selected_idx]
-                        # Get current templates
-                        agent_row = next(u for u in agent_templates if u[1] == username)
-                        current_templates = [t.strip() for t in (agent_row[4] or '').split(',') if t.strip()]
-                        st.write(f"**Editing templates for:** {username}")
-                        new_templates = st.multiselect(
-                            f"Edit templates for {username}",
-                            templates_list,
-                            default=current_templates,
-                            key=f"edit_templates_{username}"
-                        )
-                        if st.button(f"Save for {username}", key=f"save_templates_{username}"):
-                            def update_agent_templates(username, templates):
-                                conn = sqlite3.connect("data/requests.db")
-                                try:
-                                    cursor = conn.cursor()
-                                    templates_str = ','.join(templates)
-                                    cursor.execute(
-                                        "UPDATE users SET break_templates = ? WHERE username = ?",
-                                        (templates_str, username)
-                                    )
-                                    conn.commit()
-                                    return True
-                                finally:
-                                    conn.close()
-                            update_agent_templates(username, new_templates)
-                            st.success(f"Templates updated for {username}!")
-                            st.rerun()
 
 
             
@@ -3969,6 +3799,20 @@ else:
                 result = "PASS" if is_fancy == expected else "FAIL"
                 color = "green" if result == "PASS" else "red"
                 st.write(f"<span style='color:{color}'>{number[-6:]}: {result} ({pattern})</span>", unsafe_allow_html=True)
+
+def list_usernames():
+    """List all usernames in the users table."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT username FROM users")
+        usernames = cursor.fetchall()
+        st.write("Existing Usernames:", [user[0] for user in usernames])
+    finally:
+        conn.close()
+
+# Call this function to display all usernames
+list_usernames()
 
 def get_new_messages(last_check_time, group_name=None):
     """Get new messages since last check for the specified group only."""
