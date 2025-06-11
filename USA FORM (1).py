@@ -526,25 +526,9 @@ def get_group_messages(group_name=None):
         conn.close()
 
 def add_reaction_to_message(message_id, emoji, username):
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT reactions FROM group_messages WHERE id = ?", (message_id,))
-        row = cursor.fetchone()
-        if not row:
-            return False
-        reactions = json.loads(row[0]) if row[0] else {}
-        if emoji not in reactions:
-            reactions[emoji] = []
-        if username in reactions[emoji]:
-            reactions[emoji].remove(username)  # Toggle off
-            if not reactions[emoji]:
-                del reactions[emoji]
-        else:
-            reactions[emoji].append(username)
-        cursor.execute("UPDATE group_messages SET reactions = ? WHERE id = ?", (json.dumps(reactions), message_id))
-        conn.commit()
-        return True
+    # This function is now disabled as emoji reactions are removed
+    return False
+
     finally:
         conn.close()
 
