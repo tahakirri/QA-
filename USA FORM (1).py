@@ -1344,54 +1344,29 @@ def admin_break_dashboard():
     if dates:
         selected_date = st.selectbox("Select Date:", dates, index=len(dates)-1)
         
-        # Admin-only: Save and Reset Bookings button
-        if st.session_state.role == "admin":
-            if 'confirm_save_reset' not in st.session_state:
-                st.session_state.confirm_save_reset = False
-            col1, col2 = st.columns([1, 3])
+        # Add clear bookings button with proper confirmation
+        if 'confirm_clear' not in st.session_state:
+            st.session_state.confirm_clear = False
+            
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            if not st.session_state.confirm_clear:
+                if st.button("Clear All Bookings"):
+                    st.session_state.confirm_clear = True
+            
+        if st.session_state.confirm_clear:
+            st.warning("⚠️ Are you sure you want to clear all bookings? This cannot be undone!")
+            col1, col2 = st.columns([1, 1])
             with col1:
-                if not st.session_state.confirm_save_reset:
-                    if st.button("Save & Reset Bookings", help="Save current bookings to CSV and allow agents to book for a new day."):
-                        st.session_state.confirm_save_reset = True
-            if st.session_state.confirm_save_reset:
-                st.warning("⚠️ Are you sure you want to save and reset all bookings? This cannot be undone!")
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    if st.button("Yes, Save & Reset"):
-                        # Save current bookings to CSV
-                        import pandas as pd
-                        all_bookings = []
-                        for date, agents in st.session_state.agent_bookings.items():
-                            for agent, breaks in agents.items():
-                                booking = {
-                                    "Date": date,
-                                    "Agent": agent,
-                                    "Lunch": breaks.get("lunch", {}).get("time", "-") if isinstance(breaks.get("lunch"), dict) else breaks.get("lunch", "-"),
-                                    "Early Tea": breaks.get("early_tea", {}).get("time", "-") if isinstance(breaks.get("early_tea"), dict) else breaks.get("early_tea", "-"),
-                                    "Late Tea": breaks.get("late_tea", {}).get("time", "-") if isinstance(breaks.get("late_tea"), dict) else breaks.get("late_tea", "-"),
-                                    "Template": breaks.get("lunch", {}).get("template", "-") if isinstance(breaks.get("lunch"), dict) else breaks.get("template", "-"),
-                                    "Booked At": breaks.get("lunch", {}).get("booked_at", "-") if isinstance(breaks.get("lunch"), dict) else breaks.get("booked_at", "-")
-                                }
-                                all_bookings.append(booking)
-                        if all_bookings:
-                            df = pd.DataFrame(all_bookings)
-                            csv = df.to_csv(index=False).encode('utf-8')
-                            st.download_button(
-                                "Download CSV of Previous Bookings",
-                                csv,
-                                f"all_break_bookings_backup.csv",
-                                "text/csv"
-                            )
-                        # Clear all bookings
-                        st.session_state.agent_bookings = {}
-                        save_break_data()
-                        st.success("All bookings have been saved and reset! Agents can now book for a new day.")
-                        st.session_state.confirm_save_reset = False
+                if st.button("Yes, Clear All"):
+                    if clear_all_bookings():
+                        st.success("All bookings have been cleared!")
+                        st.session_state.confirm_clear = False
                         st.rerun()
-                with col2:
-                    if st.button("Cancel", key="cancel_save_reset"):
-                        st.session_state.confirm_save_reset = False
-                        st.rerun()
+            with col2:
+                if st.button("Cancel"):
+                    st.session_state.confirm_clear = False
+                    st.rerun()
         
         if selected_date in st.session_state.agent_bookings:
             bookings_data = []
