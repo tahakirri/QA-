@@ -3871,7 +3871,6 @@ else:
             
             if agent_data:
                 st.dataframe(pd.DataFrame(agent_data), use_container_width=True)
-                
                 # Only admins can delete agent accounts
                 with st.form("delete_agent_form"):
                     st.write("### Delete Agent")
@@ -3888,6 +3887,7 @@ else:
                             st.rerun()
             else:
                 st.info("No agent users found")
+# The old agent group change UI has been removed; use the unified edit panel above.
         
         with user_tabs[3]:
             # QA view
