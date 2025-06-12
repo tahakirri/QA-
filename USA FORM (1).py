@@ -2658,14 +2658,29 @@ else:
                     if st.form_submit_button("Submit"):
                         if identifier and comment:
                             # Determine group for request
-                            user_group = None
-                            for u in get_all_users():
-                                if u[1] == st.session_state.username:
-                                    user_group = u[3]
-                                    break
-                            if add_request(st.session_state.username, request_type, identifier, comment, user_group):
-                                st.success("Request submitted successfully!")
-                                st.rerun()
+                            if st.session_state.role == "admin":
+                                # Admins can select any group
+                                all_groups = list(set([u[3] for u in get_all_users() if u[3]]))
+                                if all_groups:
+                                    selected_group = st.selectbox("Assign Request to Group", all_groups, key="admin_request_group_submit")
+                                else:
+                                    st.warning("No groups available. Please create a group first.")
+                                    selected_group = None
+                                group_for_request = selected_group
+                            else:
+                                # Agents use their own group
+                                user_group = None
+                                for u in get_all_users():
+                                    if u[1] == st.session_state.username:
+                                        user_group = u[3]
+                                        break
+                                group_for_request = user_group
+                            if group_for_request:
+                                if add_request(st.session_state.username, request_type, identifier, comment, group_for_request):
+                                    st.success("Request submitted successfully!")
+                                    st.rerun()
+                            else:
+                                st.error("Please select a group for the request.")
         
             st.subheader("🔍 Search Requests")
             search_query = st.text_input("Search requests...")
