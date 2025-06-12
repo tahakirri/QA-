@@ -3821,23 +3821,43 @@ else:
                             default=current_templates,
                             key=f"edit_templates_{username}"
                         )
+
+                        # --- Group selection for agent ---
+                        all_groups = list(set([u[3] for u in get_all_users() if u[3]]))
+                        group_choice = None
+                        group_name = None
+                        if all_groups:
+                            group_options = all_groups + ["Create new group"]
+                            group_choice = st.selectbox("Change Agent Group", group_options, key=f"edit_agent_group_{username}")
+                            if group_choice == "Create new group":
+                                group_name = st.text_input("New Group Name (required)", key=f"new_group_name_{username}")
+                            else:
+                                group_name = group_choice
+                        else:
+                            st.warning("No groups found. Please create a group before assigning.")
+                            group_choice = "Create new group"
+                            group_name = st.text_input("New Group Name (required)", key=f"new_group_name_{username}")
+
                         if st.button(f"Save for {username}", key=f"save_templates_{username}"):
-                            def update_agent_templates(username, templates):
+                            def update_agent_templates_and_group(username, templates, group_name):
                                 conn = sqlite3.connect("data/requests.db")
                                 try:
                                     cursor = conn.cursor()
                                     templates_str = ','.join(templates)
                                     cursor.execute(
-                                        "UPDATE users SET break_templates = ? WHERE username = ?",
-                                        (templates_str, username)
+                                        "UPDATE users SET break_templates = ?, group_name = ? WHERE username = ?",
+                                        (templates_str, group_name, username)
                                     )
                                     conn.commit()
                                     return True
                                 finally:
                                     conn.close()
-                            update_agent_templates(username, new_templates)
-                            st.success(f"Templates updated for {username}!")
-                            st.rerun()
+                            if group_choice == "Create new group" and not group_name:
+                                st.error("Please enter a new group name.")
+                            else:
+                                update_agent_templates_and_group(username, new_templates, group_name)
+                                st.success(f"Templates and group updated for {username}!")
+                                st.rerun()
 
 
             
