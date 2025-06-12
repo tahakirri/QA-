@@ -14,6 +14,7 @@ import pytz
 os.makedirs("data", exist_ok=True)
 
 # --- Ensure DB migration for break_templates column ---
+
 def ensure_break_templates_column():
 conn = sqlite3.connect("data/requests.db")
 try:
@@ -30,6 +31,7 @@ finally:
 conn.close()
 
 ensure_break_templates_column()
+
 
 def ensure_group_messages_reactions_column():
 conn = sqlite3.connect("data/requests.db")
@@ -52,10 +54,12 @@ ensure_group_messages_reactions_column()
 # Timezone Utility Functions
 # --------------------------
 
+
 def get_casablanca_time():
 """Get current time in Casablanca, Morocco timezone"""
 morocco_tz = pytz.timezone('Africa/Casablanca')
 return datetime.now(morocco_tz).strftime("%Y-%m-%d %H:%M:%S")
+
 
 def convert_to_casablanca_date(date_str):
 """Convert a date string to Casablanca timezone"""
@@ -65,6 +69,7 @@ morocco_tz = pytz.timezone('Africa/Casablanca')
 return dt.date()  # Simplified since stored times are already in Casablanca time
 except:
 return None
+
 
 def get_date_range_casablanca(date):
 """Get start and end of day in Casablanca time"""
@@ -80,13 +85,16 @@ return None, None
 # Database Functions
 # --------------------------
 
+
 def get_db_connection():
 """Create and return a database connection."""
    os.makedirs("data", exist_ok=True)
 return sqlite3.connect("data/requests.db")
 
+
 def hash_password(password):
 return hashlib.sha256(password.encode()).hexdigest()
+
 
 def authenticate(username, password):
 conn = get_db_connection()
@@ -99,6 +107,7 @@ result = cursor.fetchone()
 return result[0] if result else None
 finally:
 conn.close()
+
 
 def init_db():
 conn = get_db_connection()
@@ -288,6 +297,7 @@ conn.commit()
 finally:
 conn.close()
 
+
 def is_killswitch_enabled():
 conn = get_db_connection()
 try:
@@ -298,6 +308,7 @@ return bool(result[0]) if result else False
 finally:
 conn.close()
 
+
 def is_chat_killswitch_enabled():
 conn = get_db_connection()
 try:
@@ -307,6 +318,7 @@ result = cursor.fetchone()
 return bool(result[0]) if result else False
 finally:
 conn.close()
+
 
 def toggle_killswitch(enable):
 conn = get_db_connection()
@@ -319,6 +331,7 @@ return True
 finally:
 conn.close()
 
+
 def toggle_chat_killswitch(enable):
 conn = get_db_connection()
 try:
@@ -329,6 +342,7 @@ conn.commit()
 return True
 finally:
 conn.close()
+
 
 def add_request(agent_name, request_type, identifier, comment, group_name=None):
 if is_killswitch_enabled():
@@ -362,6 +376,7 @@ return True
 finally:
 conn.close()
 
+
 def get_requests():
 conn = get_db_connection()
 try:
@@ -370,6 +385,7 @@ cursor.execute("SELECT * FROM requests ORDER BY timestamp DESC")
 return cursor.fetchall()
 finally:
 conn.close()
+
 
 def search_requests(query):
 conn = get_db_connection()
@@ -388,6 +404,7 @@ return cursor.fetchall()
 finally:
 conn.close()
 
+
 def update_request_status(request_id, completed):
 if is_killswitch_enabled():
 st.error("System is currently locked. Please contact the developer.")
@@ -402,6 +419,7 @@ conn.commit()
 return True
 finally:
 conn.close()
+
 
 def add_request_comment(request_id, user, comment):
 if is_killswitch_enabled():
@@ -420,6 +438,7 @@ return True
 finally:
 conn.close()
 
+
 def get_request_comments(request_id):
 conn = get_db_connection()
 try:
@@ -432,6 +451,7 @@ ORDER BY timestamp ASC
 return cursor.fetchall()
 finally:
 conn.close()
+
 
 def add_mistake(team_leader, agent_name, ticket_id, error_description):
 if is_killswitch_enabled():
@@ -450,6 +470,7 @@ return True
 finally:
 conn.close()
 
+
 def get_mistakes():
 conn = get_db_connection()
 try:
@@ -458,6 +479,7 @@ cursor.execute("SELECT * FROM mistakes ORDER BY timestamp DESC")
 return cursor.fetchall()
 finally:
 conn.close()
+
 
 def search_mistakes(query):
 conn = get_db_connection()
@@ -474,6 +496,7 @@ ORDER BY timestamp DESC
 return cursor.fetchall()
 finally:
 conn.close()
+
 
 def send_group_message(sender, message, group_name=None):
 if is_killswitch_enabled() or is_chat_killswitch_enabled():
@@ -500,6 +523,7 @@ return True
 finally:
 conn.close()
 
+
 def get_group_messages(group_name=None):
 # Harden: Never allow None, empty, or blank group_name to fetch all messages
 if group_name is None or str(group_name).strip() == "":
@@ -525,6 +549,7 @@ return messages
 finally:
 conn.close()
 
+
 def add_reaction_to_message(message_id, emoji, username):
 conn = get_db_connection()
 try:
@@ -548,6 +573,7 @@ return True
 finally:
 conn.close()
 
+
 def get_all_users(include_templates=False):
 conn = get_db_connection()
 try:
@@ -560,11 +586,13 @@ return cursor.fetchall()
 finally:
 conn.close()
 
+
 def add_user(username, password, role, group_name=None, break_templates=None):
 if is_killswitch_enabled():
 st.error("System is currently locked. Please contact the developer.")
 return False
 # Password complexity check (defense-in-depth)
+
 def is_password_complex(password):
 if len(password) < 8:
 return False
@@ -614,6 +642,7 @@ finally:
 conn.close()
 
 
+
 def delete_user(user_id):
 if is_killswitch_enabled():
 st.error("System is currently locked. Please contact the developer.")
@@ -628,12 +657,14 @@ return True
 finally:
 conn.close()
 
+
 def reset_password(username, new_password):
 """Reset a user's password"""
 if is_killswitch_enabled():
 st.error("System is currently locked. Please contact the developer.")
 return False
 # Password complexity check (defense-in-depth)
+
 def is_password_complex(password):
 if len(password) < 8:
 return False
@@ -661,6 +692,7 @@ return True
 finally:
 conn.close()
 
+
 def add_hold_image(uploader, image_data):
 if is_killswitch_enabled():
 st.error("System is currently locked. Please contact the developer.")
@@ -678,6 +710,7 @@ return True
 finally:
 conn.close()
 
+
 def get_hold_images():
 conn = get_db_connection()
 try:
@@ -686,6 +719,7 @@ cursor.execute("SELECT * FROM hold_images ORDER BY timestamp DESC")
 return cursor.fetchall()
 finally:
 conn.close()
+
 
 def clear_hold_images():
 if is_killswitch_enabled():
@@ -700,6 +734,7 @@ conn.commit()
 return True
 finally:
 conn.close()
+
 
 def clear_all_requests():
 if is_killswitch_enabled():
@@ -716,6 +751,7 @@ return True
 finally:
 conn.close()
 
+
 def clear_all_mistakes():
 if is_killswitch_enabled():
 st.error("System is currently locked. Please contact the developer.")
@@ -730,6 +766,7 @@ return True
 finally:
 conn.close()
 
+
 def clear_all_group_messages():
 if is_killswitch_enabled():
 st.error("System is currently locked. Please contact the developer.")
@@ -743,6 +780,7 @@ conn.commit()
 return True
 finally:
 conn.close()
+
 
 def add_late_login(agent_name, presence_time, login_time, reason):
 if is_killswitch_enabled():
@@ -761,6 +799,7 @@ return True
 finally:
 conn.close()
 
+
 def get_late_logins():
 conn = get_db_connection()
 try:
@@ -769,6 +808,7 @@ cursor.execute("SELECT * FROM late_logins ORDER BY timestamp DESC")
 return cursor.fetchall()
 finally:
 conn.close()
+
 
 def add_quality_issue(agent_name, issue_type, timing, mobile_number, product):
 if is_killswitch_enabled():
@@ -787,6 +827,7 @@ return True
 finally:
 conn.close()
 
+
 def get_quality_issues():
 conn = get_db_connection()
 try:
@@ -797,6 +838,7 @@ except Exception as e:
 st.error(f"Error fetching quality issues: {str(e)}")
 finally:
 conn.close()
+
 
 def add_midshift_issue(agent_name, issue_type, start_time, end_time):
 if is_killswitch_enabled():
@@ -815,6 +857,7 @@ return True
 finally:
 conn.close()
 
+
 def get_midshift_issues():
 conn = get_db_connection()
 try:
@@ -825,6 +868,7 @@ except Exception as e:
 st.error(f"Error fetching mid-shift issues: {str(e)}")
 finally:
 conn.close()
+
 
 def clear_late_logins():
 if is_killswitch_enabled():
@@ -842,6 +886,7 @@ st.error(f"Error clearing late logins: {str(e)}")
 finally:
 conn.close()
 
+
 def clear_quality_issues():
 if is_killswitch_enabled():
 st.error("System is currently locked. Please contact the developer.")
@@ -858,6 +903,7 @@ st.error(f"Error clearing quality issues: {str(e)}")
 finally:
 conn.close()
 
+
 def clear_midshift_issues():
 if is_killswitch_enabled():
 st.error("System is currently locked. Please contact the developer.")
@@ -873,6 +919,7 @@ except Exception as e:
 st.error(f"Error clearing mid-shift issues: {str(e)}")
 finally:
 conn.close()
+
 
 def send_vip_message(sender, message):
 """Send a message in the VIP-only chat"""
@@ -897,6 +944,7 @@ return True
 finally:
 conn.close()
 
+
 def get_vip_messages():
 """Get messages from the VIP-only chat"""
 conn = get_db_connection()
@@ -910,6 +958,7 @@ conn.close()
 # --------------------------
 # Break Scheduling Functions (from first code)
 # --------------------------
+
 
 def init_break_session_state():
 if 'templates' not in st.session_state:
@@ -941,6 +990,7 @@ if os.path.exists('active_templates.json'):
 with open('active_templates.json', 'r') as f:
 st.session_state.active_templates = json.load(f)
 
+
 def adjust_template_time(time_str, hours):
 """Adjust a single time string by adding/subtracting hours"""
 try:
@@ -951,6 +1001,7 @@ adjusted_time = (time_obj + timedelta(hours=hours)).time()
 return adjusted_time.strftime("%H:%M")
 except:
 return time_str
+
 
 def bulk_update_template_times(hours):
 """Update all template times by adding/subtracting hours"""
@@ -985,6 +1036,7 @@ except Exception as e:
 st.error(f"Error updating template times: {str(e)}")
 return False
 
+
 def save_break_data():
 with open('templates.json', 'w') as f:
 json.dump(st.session_state.templates, f)
@@ -995,6 +1047,7 @@ json.dump(st.session_state.agent_bookings, f)
 with open('active_templates.json', 'w') as f:
 json.dump(st.session_state.active_templates, f)
 
+
 def adjust_time(time_str, offset):
 try:
 if not time_str.strip():
@@ -1004,6 +1057,7 @@ adjusted_time = (time_obj + timedelta(hours=offset)).time()
 return adjusted_time.strftime("%H:%M")
 except:
 return time_str
+
 
 def adjust_template_times(template, offset):
 """Safely adjust template times with proper error handling"""
@@ -1029,6 +1083,7 @@ return {
 "tea_breaks": {"early": [], "late": []}
 }
 
+
 def count_bookings(date, break_type, time_slot):
 count = 0
 if date in st.session_state.agent_bookings:
@@ -1040,6 +1095,7 @@ count += 1
 elif break_type == "late_tea" and "late_tea" in breaks and isinstance(breaks["late_tea"], dict) and breaks["late_tea"].get("time") == time_slot:
 count += 1
 return count
+
 
 def display_schedule(template):
 st.header("LM US ENG 3:00 PM shift")
@@ -1075,6 +1131,7 @@ st.markdown("""
 **BREAKS SHOULD BE TAKEN AT THE NOTED TIME AND NEED TO BE CONFIRMED FROM RTA OR TEAM LEADERS**
 """)
 
+
 def migrate_booking_data():
 if 'agent_bookings' in st.session_state:
 for date in st.session_state.agent_bookings:
@@ -1100,6 +1157,7 @@ bookings["late_tea"] = {
 }
 
 save_break_data()
+
 
 def clear_all_bookings():
 if is_killswitch_enabled():
@@ -1127,6 +1185,7 @@ return True
 except Exception as e:
 st.error(f"Error clearing bookings: {str(e)}")
 return False
+
 
 def admin_break_dashboard():
 st.title("Break Schedule Management")
@@ -1413,6 +1472,7 @@ st.info("No bookings found for this date")
 else:
 st.info("No bookings available")
 
+
 def time_to_minutes(time_str):
 """Convert time string (HH:MM) to minutes since midnight"""
 try:
@@ -1420,6 +1480,7 @@ hours, minutes = map(int, time_str.split(':'))
 return hours * 60 + minutes
 except:
 return None
+
 
 def times_overlap(time1, time2, duration_minutes=15):
 """Check if two time slots overlap, assuming each break is duration_minutes long"""
@@ -1431,6 +1492,7 @@ return False
 
 # Check if the breaks overlap
 return abs(t1 - t2) < duration_minutes
+
 
 def check_break_conflicts(selected_breaks):
 """Check for conflicts between selected breaks"""
@@ -1454,6 +1516,7 @@ if times_overlap(break1_time, break2_time, 30 if "lunch" in (break1_type, break2
 return f"Conflict detected between {break1_type.replace('_', ' ')} ({break1_time}) and {break2_type.replace('_', ' ')} ({break2_time})"
 
 return None
+
 
 def agent_break_dashboard():
 st.title("Break Booking")
@@ -1743,6 +1806,7 @@ save_break_data()
 st.success("Your breaks have been confirmed!")
 st.rerun()
 
+
 def is_vip_user(username):
 """Check if a user has VIP status"""
 conn = get_db_connection()
@@ -1754,12 +1818,14 @@ return bool(result[0]) if result else False
 finally:
 conn.close()
 
+
 def is_sequential(digits, step=1):
 """Check if digits form a sequential pattern with given step"""
 try:
 return all(int(digits[i]) == int(digits[i-1]) + step for i in range(1, len(digits)))
 except:
 return False
+
 
 def is_fancy_number(phone_number):
 """Check if a phone number has a fancy pattern"""
@@ -1807,6 +1873,7 @@ if is_sequential(last_six, -1):
 patterns.append("6-digit descending sequence")
 
 # More flexible ascending/descending patterns (like 141516)
+
 def is_flexible_sequential(digits, step=1):
 digits = [int(d) for d in digits]
 for i in range(1, len(digits)):
@@ -1906,6 +1973,7 @@ valid_patterns.append(p)
 
 return bool(valid_patterns), ", ".join(valid_patterns) if valid_patterns else "No qualifying fancy pattern"
 
+
 def lycamobile_fancy_number_checker():
 phone_number = st.text_input("Enter a phone number")
 if phone_number:
@@ -1914,6 +1982,7 @@ if is_fancy:
 st.success(f"The phone number {phone_number} has a fancy pattern: {pattern}")
 else:
 st.error(f"The phone number {phone_number} does not have a fancy pattern: {pattern}")
+
 
 def set_vip_status(username, is_vip):
 """Set or remove VIP status for a user"""
@@ -1936,6 +2005,7 @@ conn.close()
 # Add this at the beginning of the file, after the imports
 if 'color_mode' not in st.session_state:
 st.session_state.color_mode = 'light'
+
 
 def inject_custom_css():
 # Add notification JavaScript
@@ -2475,1477 +2545,128 @@ init_db()
 init_break_session_state()
 
 if not st.session_state.authenticated:
-st.markdown("""
-<div class="login-container">
-<h1 style="text-align: center; margin-bottom: 2rem;">💠 Lyca Management System</h1>
-""", unsafe_allow_html=True)
-
-with st.form("login_form"):
-username = st.text_input("Username")
-password = st.text_input("Password", type="password")
-submit_col1, submit_col2, submit_col3 = st.columns([1, 2, 1])
-with submit_col2:
-if st.form_submit_button("Login", use_container_width=True):
-if username and password:
-role = authenticate(username, password)
-if role:
-st.session_state.update({
-"authenticated": True,
-"role": role,
-"username": username,
-"last_request_count": len(get_requests()),
-"last_mistake_count": len(get_mistakes()),
-"last_message_ids": [msg[0] for msg in get_group_messages()]
-})
-st.rerun()
-else:
-st.error("Invalid credentials")
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-else:
-if is_killswitch_enabled():
-st.markdown("""
-<div class="killswitch-active">
-<h3>⚠️ SYSTEM LOCKED ⚠️</h3>
-<p>The system is currently in read-only mode.</p>
-</div>
-""", unsafe_allow_html=True)
-elif is_chat_killswitch_enabled():
-st.markdown("""
-<div class="chat-killswitch-active">
-<h3>⚠️ CHAT LOCKED ⚠️</h3>
-<p>The chat functionality is currently disabled.</p>
-</div>
-""", unsafe_allow_html=True)
-
-def show_notifications():
-current_requests = get_requests()
-current_mistakes = get_mistakes()
-current_messages = get_group_messages()
-
-new_requests = len(current_requests) - st.session_state.last_request_count
-if new_requests > 0 and st.session_state.last_request_count > 0:
-st.toast(f"📋 {new_requests} new request(s) submitted!")
-st.session_state.last_request_count = len(current_requests)
-
-new_mistakes = len(current_mistakes) - st.session_state.last_mistake_count
-if new_mistakes > 0 and st.session_state.last_mistake_count > 0:
-st.toast(f"❌ {new_mistakes} new mistake(s) reported!")
-st.session_state.last_mistake_count = len(current_mistakes)
-
-current_message_ids = [msg[0] for msg in current_messages]
-new_messages = [msg for msg in current_messages if msg[0] not in st.session_state.last_message_ids]
-for msg in new_messages:
-if msg[1] != st.session_state.username:
-mentions = msg[4].split(',') if msg[4] else []
-if st.session_state.username in mentions:
-st.toast(f"💬 You were mentioned by {msg[1]}!")
-else:
-st.toast(f"💬 New message from {msg[1]}!")
-st.session_state.last_message_ids = current_message_ids
-
-show_notifications()
-
-with st.sidebar:
-# Sidebar welcome text color: dark in light mode, white in dark mode
-welcome_color = '#1e293b' if st.session_state.get('color_mode', 'light') == 'light' else '#fff'
-# Format username for welcome message
-username_display = st.session_state.username
-if username_display.lower() == "Taha kirri":
-username_display = "Taha Kirri ⚙️"
-else:
-username_display = username_display.title()
-st.markdown(f'<h2 style="color: {welcome_color};">✨ Welcome, {username_display}</h2>', unsafe_allow_html=True)
-
-# Theme toggle
-col1, col2 = st.columns([1, 6])
-with col1:
-current_icon = "🌙" if st.session_state.color_mode == 'dark' else "☀️"
-st.write(current_icon)
-with col2:
-if st.toggle("", value=st.session_state.color_mode == 'light', key='theme_toggle', label_visibility="collapsed"):
-if st.session_state.color_mode != 'light':
-st.session_state.color_mode = 'light'
-st.rerun()
-else:
-if st.session_state.color_mode != 'dark':
-st.session_state.color_mode = 'dark'
-st.rerun()
-st.markdown("---")
-
-# Base navigation options available to all users
-nav_options = []
-
-# QA users only see quality issues and fancy number
-if st.session_state.role == "qa":
-nav_options.extend([
-("📞 Quality Issues", "quality_issues"),
-("💎 Fancy Number", "fancy_number")
-])
-# Admin and agent see all regular options
-elif st.session_state.role in ["admin", "agent"]:
-nav_options.extend([
-("📋 Requests", "requests"),
-("☕ Breaks", "breaks"),
-("📊 Live KPIs ", "Live KPIs"),
-("❌ Mistakes", "mistakes"),
-("💬 Chat", "chat"),
-("⏰ Late Login", "late_login"),
-("📞 Quality Issues", "quality_issues"),
-("🔄 Mid-shift Issues", "midshift_issues"),
-("💎 Fancy Number", "fancy_number")
-])
-
-# Add admin option for admin users
-if st.session_state.role == "admin":
-nav_options.append(("⚙️ Admin", "admin"))
-
-for option, value in nav_options:
-if st.button(option, key=f"nav_{value}", use_container_width=True):
-st.session_state.current_section = value
-
-st.markdown("---")
-
-# Show notifications only for admin and agent roles
-if st.session_state.role in ["admin", "agent"]:
-pending_requests = len([r for r in get_requests() if not r[6]])
-new_mistakes = len(get_mistakes())
-unread_messages = len([m for m in get_group_messages() 
-if m[0] not in st.session_state.last_message_ids 
-and m[1] != st.session_state.username])
-
-st.markdown(f"""
-<div style="
-background-color: {'#1e293b' if st.session_state.color_mode == 'dark' else '#ffffff'};
-padding: 1rem;
-border-radius: 0.5rem;
-border: 1px solid {'#334155' if st.session_state.color_mode == 'dark' else '#e2e8f0'};
-margin-bottom: 20px;
-">
-<h4 style="
-color: {'#e2e8f0' if st.session_state.color_mode == 'dark' else '#1e293b'};
-margin-bottom: 1rem;
-">🔔 Notifications</h4>
-<p style="
-color: {'#94a3b8' if st.session_state.color_mode == 'dark' else '#475569'};
-margin-bottom: 0.5rem;
-">📋 Pending requests: {pending_requests}</p>
-<p style="
-color: {'#94a3b8' if st.session_state.color_mode == 'dark' else '#475569'};
-margin-bottom: 0.5rem;
-">❌ Recent mistakes: {new_mistakes}</p>
-<p style="
-color: {'#94a3b8' if st.session_state.color_mode == 'dark' else '#475569'};
-">💬 Unread messages: {unread_messages}</p>
-</div>
-""", unsafe_allow_html=True)
-
-if st.button("🚪 Logout", use_container_width=True):
-st.session_state.authenticated = False
-st.rerun()
-
-st.title(st.session_state.current_section.title())
-
-if st.session_state.current_section == "requests":
-if not is_killswitch_enabled():
-# Group selection for admin
-group_filter = None
-if st.session_state.role == "admin":
-all_groups = list(set([u[3] for u in get_all_users() if u[3]]))
-group_filter = st.selectbox("Select Group to View Requests", all_groups, key="admin_request_group")
-else:
-# Set group_name in session_state for agents
-if not hasattr(st.session_state, 'group_name') or not st.session_state.group_name:
-for u in get_all_users():
-if u[1] == st.session_state.username:
-st.session_state.group_name = u[3]
-break
-group_filter = st.session_state.group_name
-with st.expander("➕ Submit New Request"):
-with st.form("request_form"):
-cols = st.columns([1, 3])
-request_type = cols[0].selectbox("Type", ["Email", "Phone", "Ticket"])
-identifier = cols[1].text_input("Identifier")
-comment = st.text_area("Comment")
-if st.form_submit_button("Submit"):
-if identifier and comment:
-# Determine group for request
-if st.session_state.role == "admin":
-# Admins can select any group
-all_groups = list(set([u[3] for u in get_all_users() if u[3]]))
-if all_groups:
-selected_group = st.selectbox("Assign Request to Group", all_groups, key="admin_request_group_submit")
-else:
-st.warning("No groups available. Please create a group first.")
-selected_group = None
-group_for_request = selected_group
-else:
-# Agents use their own group
-user_group = None
-for u in get_all_users():
-if u[1] == st.session_state.username:
-user_group = u[3]
-break
-group_for_request = user_group
-if group_for_request:
-if add_request(st.session_state.username, request_type, identifier, comment, group_for_request):
-st.success("Request submitted successfully!")
-st.rerun()
-else:
-st.error("Please select a group for the request.")
-
-st.subheader("🔍 Search Requests")
-search_query = st.text_input("Search requests...")
-# Filter requests by group
-if st.session_state.role == "admin":
-# Admin can filter by any group
-if group_filter:
-all_requests = search_requests(search_query) if search_query else get_requests()
-requests = [r for r in all_requests if (len(r) > 7 and r[7] == group_filter)]
-else:
-requests = search_requests(search_query) if search_query else get_requests()
-else:
-# Agents can only see their own group, regardless of filter
-user_group = None
-for u in get_all_users():
-if u[1] == st.session_state.username:
-user_group = u[3]
-break
-all_requests = search_requests(search_query) if search_query else get_requests()
-requests = [r for r in all_requests if (len(r) > 7 and r[7] == user_group)]
-
-st.subheader("All Requests")
-for req in requests:
-req_id, agent, req_type, identifier, comment, timestamp, completed, group_name = req
-with st.container():
-cols = st.columns([0.1, 0.9])
-with cols[0]:
-st.checkbox("Done", value=bool(completed), 
-key=f"check_{req_id}", 
-on_change=update_request_status,
-args=(req_id, not completed))
-with cols[1]:
-st.markdown(f"""
-<div class="card">
-<div style="display: flex; justify-content: space-between;">
-<h4>#{req_id} - {req_type}</h4>
-<small>{timestamp}</small>
-</div>
-<p>Agent: {agent}</p>
-<p>Identifier: {identifier}</p>
-<div style="margin-top: 1rem;">
-<h5>Status Updates:</h5>
-""", unsafe_allow_html=True)
-
-comments = get_request_comments(req_id)
-for comment in comments:
-cmt_id, _, user, cmt_text, cmt_time = comment
-st.markdown(f"""
-<div class="comment-box">
-<div class="comment-user">
-<small><strong>{user}</strong></small>
-<small>{cmt_time}</small>
-</div>
-<div class="comment-text">{cmt_text}</div>
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-if st.session_state.role == "admin":
-with st.form(key=f"comment_form_{req_id}"):
-new_comment = st.text_input("Add status update/comment")
-if st.form_submit_button("Add Comment"):
-if new_comment:
-add_request_comment(req_id, st.session_state.username, new_comment)
-st.rerun()
-else:
-st.error("System is currently locked. Access to requests is disabled.")
-
-elif st.session_state.current_section == "mistakes":
-if not is_killswitch_enabled():
-# Only show mistake reporting form to admin users
-if st.session_state.role == "admin":
-with st.expander("➕ Report New Mistake"):
-with st.form("mistake_form"):
-cols = st.columns(3)
-agent_name = cols[0].text_input("Agent Name")
-ticket_id = cols[1].text_input("Ticket ID")
-error_description = st.text_area("Error Description")
-if st.form_submit_button("Submit"):
-if agent_name and ticket_id and error_description:
-add_mistake(st.session_state.username, agent_name, ticket_id, error_description)
-st.success("Mistake reported successfully!")
-st.rerun()
-
-st.subheader("🔍 Search Mistakes")
-search_query = st.text_input("Search mistakes...")
-mistakes = search_mistakes(search_query) if search_query else get_mistakes()
-
-st.subheader("Mistakes Log")
-for mistake in mistakes:
-m_id, tl, agent, ticket, error, ts = mistake
-st.markdown(f"""
-<div class="card">
-<div style="display: flex; justify-content: space-between;">
-<h4>#{m_id}</h4>
-<small>{ts}</small>
-</div>
-<p>Agent: {agent}</p>
-<p>Ticket: {ticket}</p>
-<p>Error: {error}</p>
-<p><small>Reported by: {tl}</small></p>
-</div>
-""", unsafe_allow_html=True)
-else:
-st.error("System is currently locked. Access to mistakes is disabled.")
-
-elif st.session_state.current_section == "chat":
-if not is_killswitch_enabled():
-# Add notification permission request
-st.markdown("""
-<div id="notification-container"></div>
-<script>
-// Check if notifications are supported
-if ('Notification' in window) {
-const container = document.getElementById('notification-container');
-if (Notification.permission === 'default') {
-container.innerHTML = `
-<div style=\"padding: 1rem; margin-bottom: 1rem; border-radius: 0.5rem; background-color: #1e293b; border: 1px solid #334155;\">
-<p style=\"margin: 0; color: #e2e8f0;\">Would you like to receive notifications for new messages?</p>
-<button onclick=\"requestNotificationPermission()\" style=\"margin-top: 0.5rem; padding: 0.5rem 1rem; background-color: #2563eb; color: white; border: none; border-radius: 0.25rem; cursor: pointer;\">
-Enable Notifications
-</button>
-</div>
-`;
-}
-}
-
-async function requestNotificationPermission() {
-const permission = await Notification.requestPermission();
-if (permission === 'granted') {
-document.getElementById('notification-container').style.display = 'none';
-}
-}
-</script>
-""", unsafe_allow_html=True)
-
-if is_chat_killswitch_enabled():
-st.warning("Chat functionality is currently disabled by the administrator.")
-else:
-# Group chat group selection
-group_filter = None
-if st.session_state.role == "admin":
-all_groups = list(set([u[3] for u in get_all_users() if u[3]]))
-group_filter = st.selectbox("Select Group to View Chat", all_groups, key="admin_chat_group")
-else:
-# Always look up the user's group from the users table each time
-user_group = None
-for u in get_all_users():
-if u[1] == st.session_state.username:
-user_group = u[3]
-break
-st.session_state.group_name = user_group
-group_filter = user_group
-
-st.subheader("Group Chat")
-# Enforce group message visibility: agents only see their group, admin sees selected group
-if st.session_state.role == "admin":
-# Only show messages for selected group; if not selected, show none
-view_group = group_filter if group_filter else None
-else:
-# Agents always see only their group (look up each time)
-user_group = None
-for u in get_all_users():
-if u[1] == st.session_state.username:
-user_group = u[3]
-break
-view_group = user_group
-# Harden: never allow None or empty group to fetch all messages
-if view_group is not None and str(view_group).strip() != "":
-messages = get_group_messages(view_group)
-else:
-messages = []  # No group selected or group is blank, show no messages
-if st.session_state.role == "agent":
-st.warning("You are not assigned to a group. Please contact an admin.")
-st.markdown('''<style>
-.chat-container {background: #f1f5f9; border-radius: 8px; padding: 1rem; max-height: 400px; overflow-y: auto; margin-bottom: 1rem;}
-.chat-message {display: flex; align-items: flex-start; margin-bottom: 12px;}
-.chat-message.sent {flex-direction: row-reverse;}
-.chat-message .message-avatar {width: 36px; height: 36px; background: #3b82f6; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; margin: 0 10px;}
-.chat-message .message-content {background: #fff; border-radius: 6px; padding: 8px 14px; min-width: 80px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);}
-.chat-message.sent .message-content {background: #dbeafe;}
-.chat-message .message-meta {font-size: 0.8rem; color: #64748b; margin-top: 2px;}
-</style>''', unsafe_allow_html=True)
-st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-# Chat message rendering
-for msg in reversed(messages):
-# Unpack all 7 fields (id, sender, message, ts, mentions, group_name, reactions)
-if isinstance(msg, dict):
-msg_id = msg.get('id')
-sender = msg.get('sender')
-message = msg.get('message')
-ts = msg.get('timestamp')
-mentions = msg.get('mentions')
-group_name = msg.get('group_name')
-reactions = msg.get('reactions', {})
-else:
-# fallback for tuple
-if len(msg) == 7:
-msg_id, sender, message, ts, mentions, group_name, reactions = msg
-try:
-reactions = json.loads(reactions) if reactions else {}
-except Exception:
-reactions = {}
-else:
-msg_id, sender, message, ts, mentions, group_name = msg
-reactions = {}
-is_sent = sender == st.session_state.username
-st.markdown(f"""
-<div class="chat-message {'sent' if is_sent else 'received'}">
-<div class="message-avatar">{sender[0].upper()}</div>
-<div class="message-content">
-<div>{message}</div>
-<div class="message-meta">{sender} • {ts}</div>
-</div>
-</div>
-""", unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
-
-# Chat input form (no emoji picker)
-with st.form("chat_form", clear_on_submit=True):
-message = st.text_input("Type your message...", key="chat_input")
-col1, col2 = st.columns([5,1])
-with col2:
-if st.form_submit_button("Send"):
-if message:
-# Admin: send to selected group; Agent: always look up group from users table
-if st.session_state.role == "admin":
-send_to_group = group_filter
-else:
-# Always look up the user's group from the users table
-send_to_group = None
-for u in get_all_users():
-if u[1] == st.session_state.username:
-send_to_group = u[3]
-break
-if send_to_group:
-send_group_message(st.session_state.username, message, send_to_group)
-else:
-st.warning("No group selected for chat.")
-st.rerun()
-else:
-st.error("System is currently locked. Access to chat is disabled.")
-
-elif st.session_state.current_section == "Live KPIs":
-if not is_killswitch_enabled():
-st.subheader("📋 AHT Table")
-import pandas as pd
-# --- HOLD Table Functions (now using SQLite for persistence) ---
-import io
-def add_hold_table(uploader, table_data):
-conn = get_db_connection()
-try:
-cursor = conn.cursor()
-# Only keep the latest table: clear any existing records
-cursor.execute("DELETE FROM hold_tables")
-timestamp = get_casablanca_time()  # Ensure Casablanca time
-cursor.execute("INSERT INTO hold_tables (uploader, table_data, timestamp) VALUES (?, ?, ?)", (uploader, table_data, timestamp))
-conn.commit()
-return True
-finally:
-conn.close()
-
-def get_hold_tables():
-conn = get_db_connection()
-try:
-cursor = conn.cursor()
-cursor.execute("SELECT id, uploader, table_data, timestamp FROM hold_tables ORDER BY id DESC LIMIT 1")
-result = cursor.fetchall()
-return result
-finally:
-conn.close()
-
-def clear_hold_tables():
-conn = get_db_connection()
-try:
-cursor = conn.cursor()
-cursor.execute("DELETE FROM hold_tables")
-conn.commit()
-return True
-finally:
-conn.close()
-# --- END HOLD Table Functions ---
-# Only show table paste option to admin users
-if st.session_state.role == "admin":
-st.write("Paste a table copied from Excel (CSV or tab-separated):")
-pasted_table = st.text_area("Paste table here", height=150)
-if st.button("Save HOLD Table"):
-if pasted_table.strip():
-try:
-# Try to parse as DataFrame
-try:
-df = pd.read_csv(io.StringIO(pasted_table), sep=None, engine='python')
-except Exception:
-df = pd.read_csv(io.StringIO(pasted_table), sep='\t')
-table_data = df.to_csv(index=False)
-clear_hold_tables()  # Only keep latest
-if add_hold_table(st.session_state.username, table_data):
-st.success("Table saved successfully!")
-st.rerun()
-else:
-st.error("Failed to save table.")
-except Exception as e:
-st.error(f"Error parsing table: {str(e)}")
-else:
-st.warning("Please paste a table.")
-# Add clear button with confirmation
-with st.form("clear_hold_tables_form"):
-confirm_clear_hold = st.checkbox("I understand and want to clear all HOLD tables")
-if st.form_submit_button("Clear HOLD Tables"):
-if confirm_clear_hold:
-if clear_hold_tables():
-st.success("All HOLD tables deleted successfully!")
-st.rerun()
-else:
-st.error("Failed to delete HOLD tables.")
-else:
-st.warning("Please confirm by checking the checkbox.")
-# Display most recent table (visible to all users)
-tables = get_hold_tables()
-if tables:
-table_id, uploader, table_data, timestamp = tables[0]
-st.markdown(f"""
-<div style='border: 1px solid #ddd; padding: 10px; margin-bottom: 20px; border-radius: 5px;'>
-<p><strong>Uploaded by:</strong> {uploader}</p>
-<p><small>Uploaded at: {timestamp}</small></p>
-</div>
-""", unsafe_allow_html=True)
-try:
-import pandas as pd
-import io
-df = pd.read_csv(io.StringIO(table_data))
-search_query = st.text_input("🔍 Search in table", key="hold_table_search")
-if search_query:
-filtered_df = df[df.apply(lambda row: row.astype(str).str.contains(search_query, case=False, na=False).any(), axis=1)]
-st.dataframe(filtered_df, use_container_width=True)
-else:
-st.dataframe(df, use_container_width=True)
-except Exception as e:
-st.error(f"Error displaying table: {str(e)}")
-else:
-st.info("No HOLD tables available")
-else:
-st.error("System is currently locked. Access to HOLD images is disabled.")
-
-elif st.session_state.current_section == "late_login":
-st.subheader("⏰ Late Login Report")
-
-if not is_killswitch_enabled():
-with st.form("late_login_form"):
-cols = st.columns(3)
-presence_time = cols[0].text_input("Time of presence (HH:MM)", placeholder="08:30")
-login_time = cols[1].text_input("Time of log in (HH:MM)", placeholder="09:15")
-reason = cols[2].selectbox("Reason", [
-"Workspace Issue",
-"Avaya Issue",
-"Aaad Tool",
-"Windows Issue",
-"Reset Password"
-])
-
-if st.form_submit_button("Submit"):
-try:
-datetime.strptime(presence_time, "%H:%M")
-datetime.strptime(login_time, "%H:%M")
-add_late_login(
-st.session_state.username,
-presence_time,
-login_time,
-reason
-)
-st.success("Late login reported successfully!")
-except ValueError:
-st.error("Invalid time format. Please use HH:MM format (e.g., 08:30)")
-
-st.subheader("Late Login Records")
-late_logins = get_late_logins()
-
-if st.session_state.role == "admin":
-# Search and date filter only for admin users
-col1, col2 = st.columns([2, 1])
-with col1:
-search_query = st.text_input("🔍 Search late login records...", key="late_login_search")
-with col2:
-start_date = st.date_input("Start date", key="late_login_start_date")
-end_date = st.date_input("End date", key="late_login_end_date")
-
-# Filtering logic
-if search_query or start_date or end_date:
-filtered_logins = []
-for login in late_logins:
-matches_search = True
-matches_date = True
-
-if search_query:
-matches_search = (
-search_query.lower() in login[1].lower() or  # Agent name
-search_query.lower() in login[4].lower() or  # Reason
-search_query in login[2] or  # Presence time
-search_query in login[3] # Login time
-)
-
-if start_date and end_date:
-try:
-record_date = datetime.strptime(login[5], "%Y-%m-%d %H:%M:%S").date()
-matches_date = start_date <= record_date <= end_date
-except:
-matches_date = False
-elif start_date:
-try:
-record_date = datetime.strptime(login[5], "%Y-%m-%d %H:%M:%S").date()
-matches_date = record_date == start_date
-except:
-matches_date = False
-# else: no date filter
-if matches_search and matches_date:
-filtered_logins.append(login)
-late_logins = filtered_logins
-
-if late_logins:
-data = []
-for login in late_logins:
-_, agent, presence, login_time, reason, ts = login
-data.append({
-"Agent's Name": agent,
-"Time of presence": presence,
-"Time of log in": login_time,
-"Reason": reason,
-"Reported At": ts
-})
-
-df = pd.DataFrame(data)
-st.dataframe(df)
-csv = df.to_csv(index=False).encode('utf-8')
-# File name logic
-if start_date and end_date:
-fname = f"late_logins_{start_date}_to_{end_date}.csv"
-elif start_date:
-fname = f"late_logins_{start_date}.csv"
-else:
-fname = "late_logins_all.csv"
-st.download_button(
-label="Download as CSV",
-data=csv,
-file_name=fname,
-mime="text/csv"
-)
-
-if 'confirm_clear_late_login' not in st.session_state:
-st.session_state.confirm_clear_late_login = False
-if not st.session_state.confirm_clear_late_login:
-if st.button("Clear All Records"):
-st.session_state.confirm_clear_late_login = True
-else:
-st.warning("⚠️ Are you sure you want to clear all late login records? This cannot be undone!")
-col1, col2 = st.columns([1, 1])
-with col1:
-if st.button("Yes, Clear All Late Logins"):
-clear_late_logins()
-st.session_state.confirm_clear_late_login = False
-st.rerun()
-with col2:
-if st.button("Cancel"):
-st.session_state.confirm_clear_late_login = False
-st.rerun()
-else:
-st.info("No late login records found")
-else:
-# Regular users only see their own records without search
-user_logins = [login for login in late_logins if login[1] == st.session_state.username]
-if user_logins:
-data = []
-for login in user_logins:
-_, agent, presence, login_time, reason, ts = login
-data.append({
-"Time of presence": presence,
-"Time of log in": login_time,
-"Reason": reason,
-"Reported At": ts
-})
-
-df = pd.DataFrame(data)
-st.dataframe(df)
-else:
-st.info("You have no late login records")
-
-elif st.session_state.current_section == "quality_issues":
-st.subheader("📞 Quality Related Technical Issue")
-
-if not is_killswitch_enabled():
-with st.form("quality_issue_form"):
-cols = st.columns(4)
-issue_type = cols[0].selectbox("Type of issue", [
-"Blocage Physical Avaya",
-"Hold Than Call Drop",
-"Call Drop From Workspace",
-"Wrong Space Frozen"
-])
-timing = cols[1].text_input("Timing (HH:MM)", placeholder="14:30")
-mobile_number = cols[2].text_input("Mobile number")
-product = cols[3].selectbox("Product", [
-"LM_CS_LMFR_FR",
-"LMREG_FR",
-"LM_CS_LMBE_FR",
-"LM_PM_LMFR_FR",
-"LM_CS_LMUSA_EN",
-"LM_CS_LMUSA_ES",
-"LM_CS_LMUK_EN",
-"LM_CS_LMDE_DE",
-"LM_CS_LMCH_IT",
-"LM_CS_LMNL_NL",
-"LM_CS_LMBE_FL",
-"LM_CS_LMPT_PT",
-"LM_CS_LMCH_DE",
-"LM_CS_LMIT_IT",
-"WC_CS_LMFR_LMCH_LMBE_FR",
-"WC_CS_LMDE_DE"
-])
-
-if st.form_submit_button("Submit"):
-try:
-datetime.strptime(timing, "%H:%M")
-add_quality_issue(
-st.session_state.username,
-issue_type,
-timing,
-mobile_number,
-product
-)
-st.success("Quality issue reported successfully!")
-except ValueError:
-st.error("Invalid time format. Please use HH:MM format (e.g., 14:30)")
-
-st.subheader("Quality Issue Records")
-quality_issues = get_quality_issues()
-
-# Allow both admin and QA roles to see all records and use search/filter
-if st.session_state.role in ["admin", "qa"]:
-# Search and date filter for admin and QA users
-col1, col2 = st.columns([2, 1])
-with col1:
-search_query = st.text_input("🔍 Search quality issues...", key="quality_issues_search")
-with col2:
-start_date = st.date_input("Start date", key="quality_issues_start_date")
-end_date = st.date_input("End date", key="quality_issues_end_date")
-
-# Filtering logic
-if search_query or start_date or end_date:
-filtered_issues = []
-for issue in quality_issues:
-matches_search = True
-matches_date = True
-
-if search_query:
-matches_search = (
-search_query.lower() in issue[1].lower() or  # Agent name
-search_query.lower() in issue[2].lower() or  # Issue type
-search_query in issue[3] or  # Timing
-search_query in issue[4] or  # Mobile number
-search_query.lower() in issue[5].lower()  # Product
-)
-
-if start_date and end_date:
-try:
-record_date = datetime.strptime(issue[6], "%Y-%m-%d %H:%M:%S").date()
-matches_date = start_date <= record_date <= end_date
-except:
-matches_date = False
-elif start_date:
-try:
-record_date = datetime.strptime(issue[6], "%Y-%m-%d %H:%M:%S").date()
-matches_date = record_date == start_date
-except:
-matches_date = False
-# else: no date filter
-if matches_search and matches_date:
-filtered_issues.append(issue)
-quality_issues = filtered_issues
-
-if quality_issues:
-data = []
-for issue in quality_issues:
-_, agent, issue_type, timing, mobile, product, ts = issue
-data.append({
-"Agent's Name": agent,
-"Type of issue": issue_type,
-"Timing": timing,
-"Mobile number": mobile,
-"Product": product,
-"Reported At": ts
-})
-
-df = pd.DataFrame(data)
-st.dataframe(df)
-csv = df.to_csv(index=False).encode('utf-8')
-# File name logic
-if start_date and end_date:
-fname = f"quality_issues_{start_date}_to_{end_date}.csv"
-elif start_date:
-fname = f"quality_issues_{start_date}.csv"
-else:
-fname = "quality_issues_all.csv"
-st.download_button(
-label="Download as CSV",
-data=csv,
-file_name=fname,
-mime="text/csv"
-)
-
-# Only show clear button for admins, not QA
-if st.session_state.role == "admin":
-if 'confirm_clear_quality_issues' not in st.session_state:
-st.session_state.confirm_clear_quality_issues = False
-if not st.session_state.confirm_clear_quality_issues:
-if st.button("Clear All Records"):
-st.session_state.confirm_clear_quality_issues = True
-else:
-st.warning("⚠️ Are you sure you want to clear all quality issue records? This cannot be undone!")
-col1, col2 = st.columns([1, 1])
-with col1:
-if st.button("Yes, Clear All Quality Issues"):
-clear_quality_issues()
-st.session_state.confirm_clear_quality_issues = False
-st.rerun()
-with col2:
-if st.button("Cancel"):
-st.session_state.confirm_clear_quality_issues = False
-st.rerun()
-else:
-st.info("No quality issue records found")
-else:
-# Regular users only see their own records without search
-user_issues = [issue for issue in quality_issues if issue[1] == st.session_state.username]
-if user_issues:
-data = []
-for issue in user_issues:
-_, agent, issue_type, timing, mobile, product, ts = issue
-data.append({
-"Type of issue": issue_type,
-"Timing": timing,
-"Mobile number": mobile,
-"Product": product,
-"Reported At": ts
-})
-
-df = pd.DataFrame(data)
-st.dataframe(df)
-else:
-st.info("You have no quality issue records")
-
-elif st.session_state.current_section == "midshift_issues":
-st.subheader("🔄 Mid-shift Technical Issue")
-
-if not is_killswitch_enabled():
-with st.form("midshift_issue_form"):
-cols = st.columns(3)
-issue_type = cols[0].selectbox("Issue Type", [
-"Default Not Ready",
-"Frozen Workspace",
-"Physical Avaya",
-"Pc Issue",
-"Aaad Tool",
-"Disconnected Avaya"
-])
-start_time = cols[1].text_input("Start time (HH:MM)", placeholder="10:00")
-end_time = cols[2].text_input("End time (HH:MM)", placeholder="10:30")
-
-if st.form_submit_button("Submit"):
-try:
-datetime.strptime(start_time, "%H:%M")
-datetime.strptime(end_time, "%H:%M")
-add_midshift_issue(
-st.session_state.username,
-issue_type,
-start_time,
-end_time
-)
-st.success("Mid-shift issue reported successfully!")
-except ValueError:
-st.error("Invalid time format. Please use HH:MM format (e.g., 10:00)")
-
-st.subheader("Mid-shift Issue Records")
-midshift_issues = get_midshift_issues()
-
-if st.session_state.role == "admin":
-# Search and date filter only for admin users
-col1, col2 = st.columns([2, 1])
-with col1:
-search_query = st.text_input("🔍 Search mid-shift issues...", key="midshift_issues_search")
-with col2:
-start_date = st.date_input("Start date", key="midshift_issues_start_date")
-end_date = st.date_input("End date", key="midshift_issues_end_date")
-
-# Filtering logic
-if search_query or start_date or end_date:
-filtered_issues = []
-for issue in midshift_issues:
-matches_search = True
-matches_date = True
-
-if search_query:
-matches_search = (
-search_query.lower() in issue[1].lower() or  # Agent name
-search_query.lower() in issue[2].lower() or  # Issue type
-search_query in issue[3] or  # Start time
-search_query in issue[4] # End time
-)
-
-if start_date and end_date:
-try:
-record_date = datetime.strptime(issue[5], "%Y-%m-%d %H:%M:%S").date()
-matches_date = start_date <= record_date <= end_date
-except:
-matches_date = False
-elif start_date:
-try:
-record_date = datetime.strptime(issue[5], "%Y-%m-%d %H:%M:%S").date()
-matches_date = record_date == start_date
-except:
-matches_date = False
-# else: no date filter
-if matches_search and matches_date:
-filtered_issues.append(issue)
-midshift_issues = filtered_issues
-
-if midshift_issues:
-data = []
-for issue in midshift_issues:
-_, agent, issue_type, start_time, end_time, ts = issue
-data.append({
-"Agent's Name": agent,
-"Issue Type": issue_type,
-"Start time": start_time,
-"End Time": end_time,
-"Reported At": ts
-})
-
-df = pd.DataFrame(data)
-st.dataframe(df)
-csv = df.to_csv(index=False).encode('utf-8')
-# File name logic
-if start_date and end_date:
-fname = f"midshift_issues_{start_date}_to_{end_date}.csv"
-elif start_date:
-fname = f"midshift_issues_{start_date}.csv"
-else:
-fname = "midshift_issues_all.csv"
-st.download_button(
-label="Download as CSV",
-data=csv,
-file_name=fname,
-mime="text/csv"
-)
-
-if 'confirm_clear_midshift_issues' not in st.session_state:
-st.session_state.confirm_clear_midshift_issues = False
-if not st.session_state.confirm_clear_midshift_issues:
-if st.button("Clear All Records"):
-st.session_state.confirm_clear_midshift_issues = True
-else:
-st.warning("⚠️ Are you sure you want to clear all mid-shift issue records? This cannot be undone!")
-col1, col2 = st.columns([1, 1])
-with col1:
-if st.button("Yes, Clear All Mid-shift Issues"):
-clear_midshift_issues()
-st.session_state.confirm_clear_midshift_issues = False
-st.rerun()
-with col2:
-if st.button("Cancel"):
-st.session_state.confirm_clear_midshift_issues = False
-st.rerun()
-else:
-st.info("No mid-shift issue records found")
-else:
-# Regular users only see their own records without search
-user_issues = [issue for issue in midshift_issues if issue[1] == st.session_state.username]
-if user_issues:
-data = []
-for issue in user_issues:
-_, agent, issue_type, start_time, end_time, ts = issue
-data.append({
-"Issue Type": issue_type,
-"Start time": start_time,
-"End Time": end_time,
-"Reported At": ts
-})
-
-df = pd.DataFrame(data)
-st.dataframe(df)
-else:
-st.info("You have no mid-shift issue records")
-
-elif st.session_state.current_section == "admin" and st.session_state.role == "admin":
-if st.session_state.username.lower() == "taha kirri":
-st.subheader("🚨 System Killswitch")
-current = is_killswitch_enabled()
-status = "🔴 ACTIVE" if current else "🟢 INACTIVE"
-st.write(f"Current Status: {status}")
-
-with st.form("killswitch_form"):
-col1, col2 = st.columns(2)
-confirm_killswitch = st.checkbox("I understand and want to change the killswitch status")
-if current:
-if col1.form_submit_button("Deactivate Killswitch"):
-if confirm_killswitch:
-toggle_killswitch(False)
-st.rerun()
-else:
-st.warning("Please confirm by checking the checkbox.")
-else:
-if col1.form_submit_button("Activate Killswitch"):
-if confirm_killswitch:
-toggle_killswitch(True)
-st.rerun()
-else:
-st.warning("Please confirm by checking the checkbox.")
-
-st.markdown("---")
-
-st.subheader("💬 Chat Killswitch")
-current_chat = is_chat_killswitch_enabled()
-chat_status = "🔴 ACTIVE" if current_chat else "🟢 INACTIVE"
-st.write(f"Current Status: {chat_status}")
-
-with st.form("chat_killswitch_form"):
-col1, col2 = st.columns(2)
-confirm_chat_killswitch = st.checkbox("I understand and want to change the chat killswitch status")
-if current_chat:
-if col1.form_submit_button("Deactivate Chat Killswitch"):
-if confirm_chat_killswitch:
-toggle_chat_killswitch(False)
-st.rerun()
-else:
-st.warning("Please confirm by checking the checkbox.")
-else:
-if col1.form_submit_button("Activate Chat Killswitch"):
-if confirm_chat_killswitch:
-toggle_chat_killswitch(True)
-st.rerun()
-else:
-st.warning("Please confirm by checking the checkbox.")
-
-st.markdown("---")
-
-st.subheader("🧹 Data Management")
-
-with st.form("data_clear_form"):
-clear_options = {
-"Requests": clear_all_requests,
-"Mistakes": clear_all_mistakes,
-"Chat Messages": clear_all_group_messages,
-"HOLD Images": clear_hold_images,
-"Late Logins": clear_late_logins,
-"Quality Issues": clear_quality_issues,
-"Mid-shift Issues": clear_midshift_issues,
-"ALL System Data": lambda: all([
-clear_all_requests(),
-clear_all_mistakes(),
-clear_all_group_messages(),
-clear_hold_images(),
-clear_late_logins(),
-clear_quality_issues(),
-clear_midshift_issues()
-])
-}
-
-# Dropdown for selecting what to clear
-selected_clear_option = st.selectbox(
-"Select Data to Clear", 
-list(clear_options.keys()),
-help="Choose the type of data you want to permanently delete"
-)
-
-# Warning based on selected option
-warning_messages = {
-"Requests": "This will permanently delete ALL requests and their comments!",
-"Mistakes": "This will permanently delete ALL mistakes!",
-"Chat Messages": "This will permanently delete ALL chat messages!",
-"HOLD Images": "This will permanently delete ALL HOLD images!",
-"Late Logins": "This will permanently delete ALL late login records!",
-"Quality Issues": "This will permanently delete ALL quality issue records!",
-"Mid-shift Issues": "This will permanently delete ALL mid-shift issue records!",
-"ALL System Data": "🚨 THIS WILL DELETE EVERYTHING IN THE SYSTEM! 🚨"
-}
-
-# Display appropriate warning
-if selected_clear_option == "ALL System Data":
-st.error(warning_messages[selected_clear_option])
-else:
-st.warning(warning_messages[selected_clear_option])
-
-# Confirmation checkbox for destructive actions
-confirm_clear = st.checkbox(f"I understand and want to clear {selected_clear_option}")
-
-# Submit button
-if st.form_submit_button("Clear Data"):
-if confirm_clear:
-try:
-# Call the corresponding clear function
-if clear_options[selected_clear_option]():
-st.success(f"{selected_clear_option} deleted successfully!")
-st.rerun()
-else:
-st.error("Deletion failed. Please try again.")
-except Exception as e:
-st.error(f"Error during deletion: {str(e)}")
-else:
-st.warning("Please confirm the deletion by checking the checkbox.")
-
-st.markdown("---")
-st.subheader("User Management")
-if not is_killswitch_enabled():
-# Show add user form to all admins, but with different options
-with st.form("add_user"):
-user = st.text_input("Username")
-pwd = st.text_input("Password", type="password")
-# Only show role selection to taha kirri, others can only create agent accounts
-if st.session_state.username.lower() == "taha kirri":
-role = st.selectbox("Role", ["agent", "admin", "qa"])
-else:
-role = "agent"  # Default role for accounts created by other admins
-st.info("Note: New accounts will be created as agent accounts.")
-# --- Group selection for all new users ---
-# Fetch all groups from users table
-all_groups = list(set([u[3] for u in get_all_users() if u[3]]))
-group_choice = None
-group_name = None
-if all_groups:
-group_options = all_groups + ["Create new group"]
-group_choice = st.selectbox("Assign to Group", group_options, key="add_user_group")
-if group_choice == "Create new group":
-group_name = st.text_input("New Group Name (required)")
-else:
-group_name = group_choice
-else:
-st.warning("No groups found. Please create a group before adding users.")
-group_choice = "Create new group"
-group_name = st.text_input("New Group Name (required)")
-
-# --- Break Templates Selection for Agents ---
-selected_templates = []
-if role == "agent":
-# Load templates from templates.json
-templates = []
-try:
-with open("templates.json", "r") as f:
-templates = list(json.load(f).keys())
-except Exception:
-st.warning("No break templates found. Please add templates.json.")
-if templates:
-selected_templates = st.multiselect(
-"Select break templates agent can book from:",
-templates,
-help="Choose one or more break templates for this agent"
-)
-else:
-selected_templates = []
-else:
-selected_templates = []
-
-if st.form_submit_button("Add User"):
-def is_password_complex(password):
-if len(password) < 8:
-return False
-if not re.search(r"[A-Z]", password):
-return False
-if not re.search(r"[a-z]", password):
-return False
-if not re.search(r"[0-9]", password):
-return False
-if not re.search(r"[^A-Za-z0-9]", password):
-return False
-return True
-
-if user and pwd and group_name:
-if not is_password_complex(pwd):
-st.error("Password must be at least 8 characters, include uppercase, lowercase, digit, and special character.")
-elif group_choice == "Create new group" and not group_name:
-st.error("Please enter a new group name.")
-else:
-# Pass selected_templates for agent, or empty for admin
-result = add_user(user, pwd, role, group_name, selected_templates)
-if result == "exists":
-st.error("User already exists. Please choose a different username.")
-elif result:
-st.success("User added successfully!")
-st.rerun()
-else:
-st.error("Failed to add user. Please try again.")
-
-elif not group_name:
-st.error("Group name is required.")
-
-st.subheader("Existing Users")
-users = get_all_users()
-
-# Create tabs for different user types
-user_tabs = st.tabs(["All Users", "Admins", "Agents", "QA"])
-
-# Password reset for admin
-if st.session_state.role == "admin":
-st.write("### Reset User Password")
-with st.form("reset_password_form"):
-reset_user = st.selectbox("Select User", [u[1] for u in users], key="reset_user_select")
-new_pwd = st.text_input("New Password", type="password", key="reset_user_pwd")
-if st.form_submit_button("Reset Password"):
-def is_password_complex(password):
-if len(password) < 8:
-return False
-if not re.search(r"[A-Z]", password):
-return False
-if not re.search(r"[a-z]", password):
-return False
-if not re.search(r"[0-9]", password):
-return False
-if not re.search(r"[^A-Za-z0-9]", password):
-return False
-return True
-if reset_user and new_pwd:
-if reset_user.lower() == "taha kirri":
-st.error("You cannot reset the password for the 'taha kirri' account.")
-elif not is_password_complex(new_pwd):
-st.error("Password must be at least 8 characters, include uppercase, lowercase, digit, and special character.")
-else:
-reset_password(reset_user, new_pwd)
-st.success(f"Password reset for {reset_user}")
-st.rerun()
-
-with user_tabs[0]:
-# All users view
-st.write("### All Users")
-
-# Create a dataframe for better display
-user_data = []
-for uid, uname, urole, gname in users:
-user_data.append({
-"ID": uid,
-"Username": uname,
-"Role": urole,
-"Group": gname
-})
-
-df = pd.DataFrame(user_data)
-st.dataframe(df, use_container_width=True)
-
-# User deletion with dropdown
-if st.session_state.username.lower() == "taha kirri":
-# Taha can delete any user
-with st.form("delete_user_form"):
-st.write("### Delete User")
-user_to_delete = st.selectbox(
-"Select User to Delete",
-[f"{user[0]} - {user[1]} ({user[2]})" for user in users],
-key="delete_user_select"
-)
-
-confirm_delete_user = st.checkbox("I understand and want to delete this user")
-if st.form_submit_button("Delete User") and not is_killswitch_enabled():
-if confirm_delete_user:
-user_id = int(user_to_delete.split(' - ')[0])
-if delete_user(user_id):
-st.success(f"User deleted successfully!")
-st.rerun()
-else:
-st.error("Failed to delete user.")
-else:
-st.warning("Please confirm by checking the checkbox.")
-
-with user_tabs[1]:
-# Admins view
-admin_users = [user for user in users if user[2] == "admin"]
-st.write(f"### Admin Users ({len(admin_users)})")
-
-admin_data = []
-for uid, uname, urole, gname in admin_users:
-admin_data.append({
-"ID": uid,
-"Username": uname,
-"Group": gname
-})
-
-if admin_data:
-st.dataframe(pd.DataFrame(admin_data), use_container_width=True)
-else:
-st.info("No admin users found")
-
-with user_tabs[2]:
-# Agents view
-agent_users = [user for user in users if user[2] == "agent"]
-st.write(f"### Agent Users ({len(agent_users)})")
-
-# --- Admin: Show agent to template assignments ---
-if st.session_state.role == "admin":
-st.subheader("Agent Break Template Assignments")
-agent_templates = get_all_users(include_templates=True)
-templates_list = []
-try:
-with open("templates.json", "r") as f:
-templates_list = list(json.load(f).keys())
-except Exception:
-st.warning("No break templates found. Please add templates.json.")
-
-# --- Refactored: Single agent dropdown ---
-agent_choices = [(u[1], u[3]) for u in agent_templates if u[2] == "agent"]
-agent_labels = [f"{name} ({group})" if group else name for name, group in agent_choices]
-agent_usernames = [name for name, _ in agent_choices]
-if not agent_labels:
-st.info("No agents found or no agents assigned to any templates yet.")
-else:
-selected_idx = st.selectbox("Select agent to edit templates:", options=list(range(len(agent_labels))), format_func=lambda i: agent_labels[i] if i is not None else "Select...", key="admin_agent_select")
-if selected_idx is not None:
-username = agent_usernames[selected_idx]
-# Get current templates
-agent_row = next(u for u in agent_templates if u[1] == username)
-current_templates = [t.strip() for t in (agent_row[4] or '').split(',') if t.strip()]
-st.write(f"**Editing templates for:** {username}")
-new_templates = st.multiselect(
-f"Edit templates for {username}",
-templates_list,
-default=current_templates,
-key=f"edit_templates_{username}"
-)
-
-# --- Group selection for agent ---
-all_groups = list(set([u[3] for u in get_all_users() if u[3]]))
-group_choice = None
-group_name = None
-if all_groups:
-group_options = all_groups + ["Create new group"]
-group_choice = st.selectbox("Change Agent Group", group_options, key=f"edit_agent_group_{username}")
-if group_choice == "Create new group":
-group_name = st.text_input("New Group Name (required)", key=f"new_group_name_{username}")
-else:
-group_name = group_choice
-else:
-st.warning("No groups found. Please create a group before assigning.")
-group_choice = "Create new group"
-group_name = st.text_input("New Group Name (required)", key=f"new_group_name_{username}")
-
-if st.button(f"Save for {username}", key=f"save_templates_{username}"):
-def update_agent_templates_and_group(username, templates, group_name):
-conn = sqlite3.connect("data/requests.db")
-try:
-cursor = conn.cursor()
-templates_str = ','.join(templates)
-cursor.execute(
-"UPDATE users SET break_templates = ?, group_name = ? WHERE username = ?",
-(templates_str, group_name, username)
-)
-conn.commit()
-return True
-finally:
-conn.close()
-if group_choice == "Create new group" and not group_name:
-st.error("Please enter a new group name.")
-else:
-update_agent_templates_and_group(username, new_templates, group_name)
-st.success(f"Templates and group updated for {username}!")
-st.rerun()
-
-
-
-agent_data = []
-for uid, uname, urole, gname in agent_users:
-agent_data.append({
-"ID": uid,
-"Username": uname,
-"Group": gname
-})
-
-if agent_data:
-st.dataframe(pd.DataFrame(agent_data), use_container_width=True)
-# Only admins can delete agent accounts
-with st.form("delete_agent_form"):
-st.write("### Delete Agent")
-agent_to_delete = st.selectbox(
-"Select Agent to Delete",
-[f"{user[0]} - {user[1]}" for user in agent_users],
-key="delete_agent_select"
-)
-
-if st.form_submit_button("Delete Agent") and not is_killswitch_enabled():
-agent_id = int(agent_to_delete.split(' - ')[0])
-if delete_user(agent_id):
-st.success(f"Agent deleted successfully!")
-st.rerun()
-else:
-st.info("No agent users found")
-# The old agent group change UI has been removed; use the unified edit panel above.
-
-with user_tabs[3]:
-# QA view
-qa_users = [user for user in users if user[2] == "qa"]
-st.write(f"### QA Users ({len(qa_users)})")
-
-qa_data = []
-for uid, uname, urole, gname in qa_users:
-qa_data.append({
-"ID": uid,
-"Username": uname,
-"Group": gname
-})
-
-if qa_data:
-st.dataframe(pd.DataFrame(qa_data), use_container_width=True)
-else:
-st.info("No QA users found")
-
-
-elif st.session_state.current_section == "breaks":
-if st.session_state.role == "admin":
-admin_break_dashboard()
-else:
-agent_break_dashboard()
-
-elif st.session_state.current_section == "fancy_number":
-st.title("💎 Lycamobile Fancy Number Checker")
-st.subheader("Official Policy: Analyzes last 6 digits only for qualifying patterns")
-
-phone_input = st.text_input("Enter Phone Number", placeholder="e.g., 1555123456 or 44207123456")
-
-col1, col2 = st.columns([1, 2])
-with col1:
-if st.button("🔍 Check Number"):
-if not phone_input:
-st.warning("Please enter a phone number")
-else:
-is_fancy, pattern = is_fancy_number(phone_input)
-clean_number = re.sub(r'\D', '', phone_input)
-
-# Extract last 6 digits for display
-last_six = clean_number[-6:] if len(clean_number) >= 6 else clean_number
-formatted_num = f"{last_six[:3]}-{last_six[3:]}" if len(last_six) == 6 else last_six
-
-if is_fancy:
-st.markdown(f"""
-<div class="result-box fancy-result">
-<h3><span class="fancy-number">✨ {formatted_num} ✨</span></h3>
-<p>FANCY NUMBER DETECTED!</p>
-<p><strong>Pattern:</strong> {pattern}</p>
-</div>
-""", unsafe_allow_html=True)
-else:
-st.markdown(f"""
-<div class="result-box normal-result">
-<h3><span class="normal-number">{formatted_num}</span></h3>
-<p>Standard phone number</p>
-<p><strong>Reason:</strong> {pattern}</p>
-</div>
-""", unsafe_allow_html=True)
-
-with col2:
+    st.markdown("""
+    <div class="login-container">
+    <h1 style="text-align: center; margin-bottom: 2rem;">💠 Lyca Management System</h1>
+    """, unsafe_allow_html=True)
+
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        {{ ... }}
+    st.markdown("</div>", unsafe_allow_html=True)
+
+else:
+    if is_killswitch_enabled():
+        st.markdown("""
+        <div class="killswitch-active">
+        <h3>⚠️ SYSTEM LOCKED ⚠️</h3>
+        <p>The system is currently in read-only mode.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    elif is_chat_killswitch_enabled():
+        st.markdown("""
+        <div class="chat-killswitch-active">
+        <h3>⚠️ CHAT LOCKED ⚠️</h3>
+        <p>The chat functionality is currently disabled.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    {{ ... }}
+    key=f"check_{req_id}", 
+    on_change=update_request_status,
+    args=(req_id, not completed))
+    with cols[1]:
+        st.markdown(f"""
+        <div class="card">
+        <div style="display: flex; justify-content: space-between;">
+        <h4>#{req_id} - {req_type}</h4>
+        <small>{timestamp}</small>
+        </div>
+        <p>Agent: {agent}</p>
+        <p>Identifier: {identifier}</p>
+        <div style="margin-top: 1rem;">
+        <h5>Status Updates:</h5>
+        """, unsafe_allow_html=True)
+
+        comments = get_request_comments(req_id)
+        for comment in comments:
+            cmt_id, _, user, cmt_text, cmt_time = comment
+            st.markdown(f"""
+            <div class="comment-box">
+            <div class="comment-user">
+            <small><strong>{user}</strong></small>
+            <small>{cmt_time}</small>
+            </div>
+            <div class="comment-text">{cmt_text}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    {{ ... }}
+
+    st.subheader("Mistakes Log")
+    for mistake in mistakes:
+        m_id, tl, agent, ticket, error, ts = mistake
+        st.markdown(f"""
+        <div class="card">
+        <div style="display: flex; justify-content: space-between;">
+        <h4>#{m_id}</h4>
+        <small>{ts}</small>
+        </div>
+        <p>Agent: {agent}</p>
+        {{ ... }}
+
+    .chat-message .message-avatar {width: 36px; height: 36px; background: #3b82f6; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; margin: 0 10px;}
+    .chat-message .message-content {background: #fff; border-radius: 6px; padding: 8px 14px; min-width: 80px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);}
+    .chat-message.sent .message-content {background: #dbeafe;}
+    .chat-message .message-meta {font-size: 0.8rem; color: #64748b; margin-top: 2px;}
+    </style>''', unsafe_allow_html=True)
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    # Chat message rendering
+    for msg in reversed(messages):
+        # Unpack all 7 fields (id, sender, message, ts, mentions, group_name, reactions)
+        if isinstance(msg, dict):
+            msg_id = msg.get('id')
+            {{ ... }}
+        else:
+            msg_id, sender, message, ts, mentions, group_name = msg
+            reactions = {}
+            is_sent = sender == st.session_state.username
+            st.markdown(f"""
+            <div class="chat-message {'sent' if is_sent else 'received'}">
+            <div class="message-avatar">{sender[0].upper()}</div>
+            <div class="message-content">
+            <div>{message}</div>
+            <div class="message-meta">{sender} • {ts}</div>
+            </div>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    {{ ... }}
+
+    last_six = clean_number[-6:] if len(clean_number) >= 6 else clean_number
+    formatted_num = f"{last_six[:3]}-{last_six[3:]}" if len(last_six) == 6 else last_six
+
+    if is_fancy:
+        st.markdown(f"""
+        <div class="result-box fancy-result">
+        <h3><span class="fancy-number">✨ {formatted_num} ✨</span></h3>
+        <p>FANCY NUMBER DETECTED!</p>
+        <p><strong>Pattern:</strong> {pattern}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="result-box normal-result">
+        <h3><span class="normal-number">{formatted_num}</span></h3>
+        <p>Standard phone number</p>
+        <p><strong>Reason:</strong> {pattern}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    {{ ... }}
 st.markdown("""
 ### Lycamobile Fancy Number Policy
 **Qualifying Patterns (last 6 digits only):**
@@ -3996,6 +2717,7 @@ result = "PASS" if is_fancy == expected else "FAIL"
 color = "green" if result == "PASS" else "red"
 st.write(f"<span style='color:{color}'>{number[-6:]}: {result} ({pattern})</span>", unsafe_allow_html=True)
 
+
 def get_new_messages(last_check_time, group_name=None):
 """Get new messages since last check for the specified group only."""
 # Never allow None, empty, or blank group_name to fetch all messages
@@ -4013,6 +2735,7 @@ ORDER BY timestamp DESC
 return cursor.fetchall()
 finally:
 conn.close()
+
 
 def handle_message_check():
 if not st.session_state.authenticated:
@@ -4050,6 +2773,7 @@ messages_data.append({
 return {"new_messages": bool(messages_data), "messages": messages_data}
 return {"new_messages": False, "messages": []}
 
+
 def convert_to_casablanca_date(date_str):
 """Convert a date string to Casablanca timezone"""
 try:
@@ -4059,12 +2783,14 @@ return pytz.UTC.localize(dt).astimezone(morocco_tz).date()
 except:
 return None
 
+
 def get_date_range_casablanca(date):
 """Get start and end of day in Casablanca time"""
 morocco_tz = pytz.timezone('Africa/Casablanca')
 start = morocco_tz.localize(datetime.combine(date, time.min))
 end = morocco_tz.localize(datetime.combine(date, time.max))
 return start, end
+
 
 if __name__ == "__main__":
 # Initialize color mode if not set
