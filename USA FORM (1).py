@@ -2885,16 +2885,7 @@ else:
                     """, unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # Emoji picker for chat input
-                
-                st.markdown("<div style='margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
-                emoji_cols = st.columns(len(emoji_choices))
-                for i, emoji in enumerate(emoji_choices):
-                    if emoji_cols[i].button(emoji, key=f"emoji_picker_{emoji}"):
-                        if 'chat_input' not in st.session_state:
-                            st.session_state['chat_input'] = ''
-                        st.session_state['chat_input'] += emoji
-                st.markdown("</div>", unsafe_allow_html=True)
+                # Chat input form (no emoji picker)
                 with st.form("chat_form", clear_on_submit=True):
                     message = st.text_input("Type your message...", key="chat_input")
                     col1, col2 = st.columns([5,1])
