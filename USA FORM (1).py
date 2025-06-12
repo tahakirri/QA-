@@ -4950,30 +4950,25 @@ if not st.session_state.authenticated:
 
                 if username and password:
 
-                    role = authenticate(username, password)
+                    try:
+                        role = authenticate(username, password)
+                    except Exception as e:
+                        st.error("Database error: Please contact the administrator.\n" + str(e))
+                        role = None
 
                     if role:
-
                         st.session_state.update({
-
                             "authenticated": True,
-
                             "role": role,
-
                             "username": username,
-
                             "last_request_count": len(get_requests()),
-
                             "last_mistake_count": len(get_mistakes()),
-
                             "last_message_ids": [msg[0] for msg in get_group_messages()]
-
                         })
-
                         st.rerun()
-
+                    elif role is None:
+                        pass  # Already handled error above
                     else:
-
                         st.error("Invalid credentials")
 
     
