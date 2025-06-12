@@ -2,6 +2,7 @@ import streamlit as st
 import sqlite3
 import hashlib
 from datetime import datetime, time, timedelta
+from bs4 import BeautifulSoup
 import os
 import re
 from PIL import Image
