@@ -3706,26 +3706,6 @@ else:
                             reset_password(reset_user, new_pwd)
                             st.success(f"Password reset for {reset_user}")
                             st.rerun()
-        # Group editing for admin
-        if st.session_state.username.lower() == "taha kirri":
-            st.write("### Change Agent Group")
-            agent_users = [user for user in users if user[2] == "agent"]
-            if agent_users:
-                agent_names = [f"{u[1]} (Current: {u[3]})" for u in agent_users]
-                selected_agent = st.selectbox("Select Agent", agent_names, key="edit_agent_group")
-                new_group = st.text_input("New Group Name", key="edit_group_name")
-                if st.button("Change Group"):
-                    agent_id = agent_users[agent_names.index(selected_agent)][0]
-                    # Update group in DB
-                    conn = get_db_connection()
-                    try:
-                        cursor = conn.cursor()
-                        cursor.execute("UPDATE users SET group_name = ? WHERE id = ?", (new_group, agent_id))
-                        conn.commit()
-                        st.success("Group updated!")
-                        st.rerun()
-                    finally:
-                        conn.close()
         
         with user_tabs[0]:
             # All users view
