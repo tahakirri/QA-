@@ -3627,6 +3627,8 @@ else:
                     if user and pwd and group_name:
                         if not is_password_complex(pwd):
                             st.error("Password must be at least 8 characters, include uppercase, lowercase, digit, and special character.")
+                        elif group_choice == "Create new group" and not group_name:
+                            st.error("Please enter a new group name.")
                         else:
                             # Pass selected_templates for agent, or empty for admin
                             result = add_user(user, pwd, role, group_name, selected_templates)
