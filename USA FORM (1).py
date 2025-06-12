@@ -3586,8 +3586,22 @@ else:
                 else:
                     role = "agent"  # Default role for accounts created by other admins
                     st.info("Note: New accounts will be created as agent accounts.")
-                # Group selection for all new users
-                group_name = st.text_input("Group Name (required)")
+                # --- Group selection for all new users ---
+                # Fetch all groups from users table
+                all_groups = list(set([u[3] for u in get_all_users() if u[3]]))
+                group_choice = None
+                group_name = None
+                if all_groups:
+                    group_options = all_groups + ["Create new group"]
+                    group_choice = st.selectbox("Assign to Group", group_options, key="add_user_group")
+                    if group_choice == "Create new group":
+                        group_name = st.text_input("New Group Name (required)")
+                    else:
+                        group_name = group_choice
+                else:
+                    st.warning("No groups found. Please create a group before adding users.")
+                    group_choice = "Create new group"
+                    group_name = st.text_input("New Group Name (required)")
 
                 # --- Break Templates Selection for Agents ---
                 selected_templates = []
