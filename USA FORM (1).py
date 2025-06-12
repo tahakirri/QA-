@@ -3290,23 +3290,25 @@ else:
                     mime="text/csv"
                 )
                 
-                if 'confirm_clear_quality_issues' not in st.session_state:
-                    st.session_state.confirm_clear_quality_issues = False
-                if not st.session_state.confirm_clear_quality_issues:
-                    if st.button("Clear All Records"):
-                        st.session_state.confirm_clear_quality_issues = True
-                else:
-                    st.warning("⚠️ Are you sure you want to clear all quality issue records? This cannot be undone!")
-                    col1, col2 = st.columns([1, 1])
-                    with col1:
-                        if st.button("Yes, Clear All Quality Issues"):
-                            clear_quality_issues()
-                            st.session_state.confirm_clear_quality_issues = False
-                            st.rerun()
-                    with col2:
-                        if st.button("Cancel"):
-                            st.session_state.confirm_clear_quality_issues = False
-                            st.rerun()
+                # Only show clear button for admins, not QA
+                if st.session_state.role == "admin":
+                    if 'confirm_clear_quality_issues' not in st.session_state:
+                        st.session_state.confirm_clear_quality_issues = False
+                    if not st.session_state.confirm_clear_quality_issues:
+                        if st.button("Clear All Records"):
+                            st.session_state.confirm_clear_quality_issues = True
+                    else:
+                        st.warning("⚠️ Are you sure you want to clear all quality issue records? This cannot be undone!")
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            if st.button("Yes, Clear All Quality Issues"):
+                                clear_quality_issues()
+                                st.session_state.confirm_clear_quality_issues = False
+                                st.rerun()
+                        with col2:
+                            if st.button("Cancel"):
+                                st.session_state.confirm_clear_quality_issues = False
+                                st.rerun()
             else:
                 st.info("No quality issue records found")
         else:
