@@ -6,8 +6,6 @@ import hashlib
 
 from datetime import datetime, time, timedelta
 
-from bs4 import BeautifulSoup
-
 import os
 
 import re
