@@ -3345,10 +3345,11 @@ else:
             with st.form("quality_issue_form"):
                 cols = st.columns(4)
                 issue_type = cols[0].selectbox("Type of issue", [
-                    "Blocage Physical Avaya",
-                    "Hold Than Call Drop",
-                    "Call Drop From Workspace",
-                    "Wrong Space Frozen"
+                "Audio Issue",
+                "Call Drop From Rc",
+                "Call Frozen",
+                "CRM Issue",
+                "Hold Frozen"
                 ])
                 timing = cols[1].text_input("Timing (HH:MM)", placeholder="14:30")
                 mobile_number = cols[2].text_input("Mobile number")
@@ -4237,4 +4238,5 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
+
 
