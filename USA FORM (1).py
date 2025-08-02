@@ -2743,15 +2743,7 @@ else:
                 '''
                 components.html(js_code, height=0)
 
-        # --- Auto-update & browser notification for admin when new request is added ---
-        if st.session_state.role == "admin":
-            # Server-side rerun every 15 s keeps data fresh without a full tab reload
-            try:
-                from streamlit_autorefresh import st_autorefresh  # type: ignore
-                st_autorefresh(interval=15000, key="admin_autorefresh")
-            except ImportError:
-                # Package not available – skip (notifications will still work on manual interaction)
-                pass
+
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.authenticated = False
             st.rerun()
