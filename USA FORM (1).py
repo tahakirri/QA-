@@ -2835,9 +2835,8 @@ else:
             calendar(events=events, options={"initialView": "timeGridWeek", "headerToolbar": {"left": "prev,next today","center": "title","right": "dayGridMonth,timeGridWeek,timeGridDay"}})
         except ImportError:
             st.error("streamlit-calendar is not installed. Please add it to requirements.txt.")
-        return
 
-    if st.session_state.current_section == "requests":
+    elif st.session_state.current_section == "requests":
         if not is_killswitch_enabled():
             # Group selection for admin
             group_filter = None
