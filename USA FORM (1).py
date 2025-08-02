@@ -1476,7 +1476,6 @@ def agent_break_dashboard():
     agent_id = st.session_state.username
     morocco_tz = pytz.timezone('Africa/Casablanca')
     now_casa = datetime.now(morocco_tz)
-    server_time_iso = now_casa.isoformat()
     casa_date = now_casa.strftime('%Y-%m-%d')
     current_date = casa_date  # Use Casablanca date for all booking logic
 
@@ -1593,8 +1592,8 @@ def agent_break_dashboard():
         if (!window.breakNotificationInterval) {{
             console.log('Starting break notification poller.');
             window.breakNotificationInterval = setInterval(() => {{
-                // Simply re-run the notification check without reloading the page
-                checkAndNotifyBreaks();
+                // Reload to get fresh server time
+                top.location.reload();
             }}, 60000); // Check every minute
         }}
 
@@ -2644,7 +2643,7 @@ else:
         elif st.session_state.role in ["admin", "agent"]:
             nav_options.extend([
                 ("📋 Requests", "requests"),
-                ("🍩 Breaks", "breaks"),
+                ("☕ Breaks", "breaks"),
                 ("📊 Live KPIs ", "Live KPIs"),
                 ("❌ Mistakes", "mistakes"),
                 ("💬 Chat", "chat"),
@@ -2698,65 +2697,12 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            # --- Break reminder notifications for agents (5-minute warning) ---
-            if st.session_state.role == "agent":
-                morocco_tz = pytz.timezone('Africa/Casablanca')
-                now_casa = datetime.now(morocco_tz)
-                today_str = now_casa.strftime('%Y-%m-%d')
-                agent_id = st.session_state.username
-                bookings_today = (
-                    st.session_state.get('agent_bookings', {}).get(today_str, {}).get(agent_id)
-                )
-                if bookings_today:
-                    break_times = []
-                    for b_type in ["lunch", "early_tea", "late_tea"]:
-                        entry = bookings_today.get(b_type)
-                        if isinstance(entry, dict):
-                            t = entry.get("time")
-                            if t:
-                                break_times.append(t)
-                    if break_times:
-                        # keep server time fresh without full reload
-                        try:
-                            from streamlit_autorefresh import st_autorefresh  # type: ignore
-                            st_autorefresh(interval=60000, key="agent_autorefresh")
-                        except ImportError:
-                            pass
-                        import streamlit.components.v1 as components
-                        js_break = f"""
-                        <script>
-                        const breakTimes = {json.dumps(break_times)};
-                        const serverTimeISO = '{now_casa.isoformat()}';
-                        const keyPrefix = 'notified_break_sidebar_';
-                        (function() {{
-                            const now = new Date(serverTimeISO);
-                            const today = now.toISOString().split('T')[0];
-                            breakTimes.forEach(bt => {{
-                                const [h,m] = bt.split(':');
-                                const bTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-                                const diffMin = Math.floor((bTime - now) / 60000);
-                                const storageKey = keyPrefix + today + '_' + bt;
-                                if (diffMin >= 4 && diffMin < 5 && !localStorage.getItem(storageKey)) {{
-                                    const notify = () => new Notification('Break Reminder', {{ body: `Your break starts in 5 minutes at ${{bt}}.` }});
-                                    if (Notification.permission === 'granted') {{
-                                        notify();
-                                        localStorage.setItem(storageKey,'1');
-                                    }} else if (Notification.permission !== 'denied') {{
-                                        Notification.requestPermission().then(p => {{ if (p==='granted') {{ notify(); localStorage.setItem(storageKey,'1'); }} }});
-                                    }}
-                                }}
-                            }});
-                        }})();
-                        </script>
-                        """
-                        components.html(js_break, height=0)
-
             # --- Auto-update & browser notification for admin when new request is added ---
             if st.session_state.role == "admin":
                 # Server-side rerun every 15 s keeps data fresh without a full tab reload
                 try:
                     from streamlit_autorefresh import st_autorefresh  # type: ignore
-                    st_autorefresh(interval=1000, key="admin_autorefresh")
+                    st_autorefresh(interval=15000, key="admin_autorefresh")
                 except ImportError:
                     # Package not available – skip (notifications will still work on manual interaction)
                     pass
@@ -3205,12 +3151,11 @@ else:
                 presence_time = cols[0].text_input("Time of presence (HH:MM)", placeholder="08:30")
                 login_time = cols[1].text_input("Time of log in (HH:MM)", placeholder="09:15")
                 reason = cols[2].selectbox("Reason", [
-                    "Disconnected RC",
-                    "Frozen Ring",
-                    "PC ISSUE",
-                    "RC Extension issue",
-                    "Ring Central issue",
-                    "Windows issue"
+                    "Workspace Issue",
+                    "Avaya Issue",
+                    "Aaad Tool",
+                    "Windows Issue",
+                    "Reset Password"
                 ])
                 
                 if st.form_submit_button("Submit"):
@@ -3345,11 +3290,10 @@ else:
             with st.form("quality_issue_form"):
                 cols = st.columns(4)
                 issue_type = cols[0].selectbox("Type of issue", [
-                "Audio Issue",
-                "Call Drop From Rc",
-                "Call Frozen",
-                "CRM Issue",
-                "Hold Frozen"
+                    "Blocage Physical Avaya",
+                    "Hold Than Call Drop",
+                    "Call Drop From Workspace",
+                    "Wrong Space Frozen"
                 ])
                 timing = cols[1].text_input("Timing (HH:MM)", placeholder="14:30")
                 mobile_number = cols[2].text_input("Mobile number")
@@ -3510,12 +3454,12 @@ else:
             with st.form("midshift_issue_form"):
                 cols = st.columns(3)
                 issue_type = cols[0].selectbox("Issue Type", [
-                "Extension issue",
-                "Windows Issue",
-                "PC Issue",
-                "Disconnected RC",
-                "Frozen Ring"
-
+                    "Default Not Ready",
+                    "Frozen Workspace",
+                    "Physical Avaya",
+                    "Pc Issue",
+                    "Aaad Tool",
+                    "Disconnected Avaya"
                 ])
                 start_time = cols[1].text_input("Start time (HH:MM)", placeholder="10:00")
                 end_time = cols[2].text_input("End time (HH:MM)", placeholder="10:30")
@@ -4238,9 +4182,3 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
-
-
-
-
-
-
