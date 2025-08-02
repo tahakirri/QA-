@@ -3205,11 +3205,12 @@ else:
                 presence_time = cols[0].text_input("Time of presence (HH:MM)", placeholder="08:30")
                 login_time = cols[1].text_input("Time of log in (HH:MM)", placeholder="09:15")
                 reason = cols[2].selectbox("Reason", [
-                    "Workspace Issue",
-                    "Avaya Issue",
-                    "Aaad Tool",
-                    "Windows Issue",
-                    "Reset Password"
+                    "Disconnected RC",
+                    "Frozen Ring",
+                    "PC ISSUE",
+                    "RC Extension issue",
+                    "Ring Central issue",
+                    "Windows issue"
                 ])
                 
                 if st.form_submit_button("Submit"):
@@ -3344,10 +3345,11 @@ else:
             with st.form("quality_issue_form"):
                 cols = st.columns(4)
                 issue_type = cols[0].selectbox("Type of issue", [
-                    "Blocage Physical Avaya",
-                    "Hold Than Call Drop",
-                    "Call Drop From Workspace",
-                    "Wrong Space Frozen"
+                "Audio Issue",
+                "Call Drop From Rc",
+                "Call Frozen",
+                "CRM Issue",
+                "Hold Frozen"
                 ])
                 timing = cols[1].text_input("Timing (HH:MM)", placeholder="14:30")
                 mobile_number = cols[2].text_input("Mobile number")
@@ -3508,12 +3510,12 @@ else:
             with st.form("midshift_issue_form"):
                 cols = st.columns(3)
                 issue_type = cols[0].selectbox("Issue Type", [
-                    "Default Not Ready",
-                    "Frozen Workspace",
-                    "Physical Avaya",
-                    "Pc Issue",
-                    "Aaad Tool",
-                    "Disconnected Avaya"
+                "Extension issue",
+                "Windows Issue",
+                "PC Issue",
+                "Disconnected RC",
+                "Frozen Ring"
+
                 ])
                 start_time = cols[1].text_input("Start time (HH:MM)", placeholder="10:00")
                 end_time = cols[2].text_input("End time (HH:MM)", placeholder="10:30")
@@ -4236,3 +4238,5 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
+
+
