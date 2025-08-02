@@ -2781,7 +2781,6 @@ function notifyNewRequest(name) {
     }
 }
 
-
                 function checkAndNotify() {{
                     let last = parseInt(window.localStorage.getItem(key) || '0');
                     if (currentPending > last) {{
@@ -4241,6 +4240,7 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
+
 
 
 
