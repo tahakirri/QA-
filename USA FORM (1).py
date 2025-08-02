@@ -2736,7 +2736,7 @@ else:
                                 const diffMin = Math.floor((bTime - now) / 60000);
                                 const storageKey = keyPrefix + today + '_' + bt;
                                 if (diffMin >= 4 && diffMin < 5 && !localStorage.getItem(storageKey)) {{
-                                    const notify = () => new Notification('Break Reminder', {{ body: `Your break starts in 5 minutes at ${bt}.` }});
+                                    const notify = () => new Notification('Break Reminder', {{ body: `Your break starts in 5 minutes at ${{bt}}.` }});
                                     if (Notification.permission === 'granted') {{
                                         notify();
                                         localStorage.setItem(storageKey,'1');
