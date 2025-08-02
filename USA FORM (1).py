@@ -371,16 +371,6 @@ def get_requests():
     finally:
         conn.close()
 
-def get_latest_request():
-    """Get the most recent request from the database"""
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM requests ORDER BY timestamp DESC LIMIT 1")
-        return cursor.fetchone()
-    finally:
-        conn.close()
-
 def search_requests(query):
     conn = get_db_connection()
     try:
@@ -2547,15 +2537,6 @@ if not st.session_state.authenticated:
             <h1 style="text-align: center; margin-bottom: 2rem;">💠 Lyca Management System</h1>
     """, unsafe_allow_html=True)
     
-    # Handle AJAX request for latest requester
-    if st.experimental_get_query_params().get('get_latest_requester') == ['true']:
-        latest_request = get_latest_request()
-        if latest_request:
-            st.json({"requester": latest_request[1]})  # index 1 is the agent_name
-        else:
-            st.json({"requester": None})
-        st.stop()
-
     with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
@@ -2786,17 +2767,13 @@ else:
                 const currentPending = {pending_requests};
                 const key = 'lastPendingRequests';
 
-                function notifyNewRequest(requester) {{
-                    const message = requester ? 
-                        `New request submitted by ${requester}` : 
-                        "A new request has been submitted.";
-                        
+                function notifyNewRequest() {{
                     if (Notification.permission === "granted") {{
-                        new Notification("New Request", {{ body: message }});
+                        new Notification("New Request", {{ body: "A new request has been submitted." }});
                     }} else if (Notification.permission !== "denied") {{
                         Notification.requestPermission().then(perm => {{
                             if (perm === "granted") {{
-                                new Notification("New Request", {{ body: message }});
+                                new Notification("New Request", {{ body: "A new request has been submitted." }});
                             }}
                         }});
                     }}
@@ -2805,22 +2782,7 @@ else:
                 function checkAndNotify() {{
                     let last = parseInt(window.localStorage.getItem(key) || '0');
                     if (currentPending > last) {{
-                        // Fetch the latest request to get the requester's name
-                        fetch(window.location.href, {{
-                            method: 'POST',
-                            headers: {{
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                            }},
-                            body: 'get_latest_requester=true'
-                        }})
-                        .then(response => response.json())
-                        .then(data => {{
-                            notifyNewRequest(data.requester || '');
-                        }})
-                        .catch(error => {{
-                            console.error('Error fetching latest requester:', error);
-                            notifyNewRequest('');
-                        }});
+                        notifyNewRequest();
                     }}
                     window.localStorage.setItem(key, currentPending);
                 }}
