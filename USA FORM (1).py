@@ -2767,13 +2767,17 @@ else:
                 const currentPending = {pending_requests};
                 const key = 'lastPendingRequests';
 
-                function notifyNewRequest() {{
+                function notifyNewRequest(requester) {{
+                    const message = requester ? 
+                        `New request submitted by ${requester}` : 
+                        "A new request has been submitted.";
+                        
                     if (Notification.permission === "granted") {{
-                        new Notification("New Request", {{ body: "A new request has been submitted." }});
+                        new Notification("New Request", {{ body: message }});
                     }} else if (Notification.permission !== "denied") {{
                         Notification.requestPermission().then(perm => {{
                             if (perm === "granted") {{
-                                new Notification("New Request", {{ body: "A new request has been submitted." }});
+                                new Notification("New Request", {{ body: message }});
                             }}
                         }});
                     }}
@@ -2782,7 +2786,22 @@ else:
                 function checkAndNotify() {{
                     let last = parseInt(window.localStorage.getItem(key) || '0');
                     if (currentPending > last) {{
-                        notifyNewRequest();
+                        // Fetch the latest request to get the requester's name
+                        fetch(window.location.href, {{
+                            method: 'POST',
+                            headers: {{
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            }},
+                            body: 'get_latest_requester=true'
+                        }})
+                        .then(response => response.json())
+                        .then(data => {{
+                            notifyNewRequest(data.requester || '');
+                        }})
+                        .catch(error => {{
+                            console.error('Error fetching latest requester:', error);
+                            notifyNewRequest('');
+                        }});
                     }}
                     window.localStorage.setItem(key, currentPending);
                 }}
@@ -4238,6 +4257,7 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
+
 
 
 
