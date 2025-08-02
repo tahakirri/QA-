@@ -2656,7 +2656,6 @@ else:
         
         # Add admin option for admin users
         if st.session_state.role == "admin":
-            nav_options.append(("🗓️ Calendar", "calendar"))
             nav_options.append(("⚙️ Admin", "admin"))
         
         for option, value in nav_options:
@@ -2805,38 +2804,7 @@ else:
 
     st.title(st.session_state.current_section.title())
 
-    # --- Admin Calendar View for Bookings ---
-    if st.session_state.current_section == "calendar" and st.session_state.role == "admin":
-        try:
-            from streamlit_calendar import calendar
-            import pytz
-            from datetime import datetime, timedelta
-            import json
-            def build_break_events():
-                tz = pytz.timezone("Africa/Casablanca")
-                events = []
-                bookings = st.session_state.get('agent_bookings', {})
-                for date_str, agents in bookings.items():
-                    for agent, breaks in agents.items():
-                        for btype, meta in breaks.items():
-                            if not isinstance(meta, dict):
-                                continue
-                            start_dt = datetime.strptime(f"{date_str} {meta['time']}", "%Y-%m-%d %H:%M").astimezone(tz)
-                            dur = timedelta(minutes=30 if btype=="lunch" else 15)
-                            events.append({
-                                "title": f"{agent} – {btype.replace('_',' ').title()}",
-                                "start": start_dt.isoformat(),
-                                "end":   (start_dt + dur).isoformat(),
-                                "color": "#16a34a" if btype=="lunch" else "#f97316",
-                            })
-                return events
-            events = build_break_events()
-            st.info("This calendar shows all confirmed agent breaks. Click events for details.")
-            calendar(events=events, options={"initialView": "timeGridWeek", "headerToolbar": {"left": "prev,next today","center": "title","right": "dayGridMonth,timeGridWeek,timeGridDay"}})
-        except ImportError:
-            st.error("streamlit-calendar is not installed. Please add it to requirements.txt.")
-
-    elif st.session_state.current_section == "requests":
+    if st.session_state.current_section == "requests":
         if not is_killswitch_enabled():
             # Group selection for admin
             group_filter = None
