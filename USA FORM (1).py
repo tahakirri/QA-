@@ -2555,14 +2555,14 @@ else:
     if is_killswitch_enabled():
         st.markdown("""
         <div class="killswitch-active">
-            <h3>⚠️ SYSTEM LOCKED ⚠️</h3>
+            <h3>SYSTEM LOCKED</h3>
             <p>The system is currently in read-only mode.</p>
         </div>
         """, unsafe_allow_html=True)
     elif is_chat_killswitch_enabled():
         st.markdown("""
         <div class="chat-killswitch-active">
-            <h3>⚠️ CHAT LOCKED ⚠️</h3>
+            <h3>CHAT LOCKED</h3>
             <p>The chat functionality is currently disabled.</p>
         </div>
         """, unsafe_allow_html=True)
