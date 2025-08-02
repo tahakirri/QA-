@@ -2751,6 +2751,38 @@ else:
                         """
                         components.html(js_break, height=0)
 
+            # --- Browser notification for agent when new group chat message arrives ---
+            if st.session_state.role == "agent":
+                # server-side rerun every 15s for fresh message count (lightweight)
+                try:
+                    from streamlit_autorefresh import st_autorefresh  # type: ignore
+                    st_autorefresh(interval=1000, key="agent_chat_autorefresh")
+                except ImportError:
+                    pass
+                import streamlit.components.v1 as components
+                js_chat = f'''
+                <script>
+                const unreadMsgs = {unread_messages};
+                const msgKey = 'lastUnreadMsgs';
+                function notifyNewMsg() {{
+                    if (Notification.permission === "granted") {{
+                        new Notification("New Chat Message", {{ body: "You have a new group chat message." }});
+                    }} else if (Notification.permission !== "denied") {{
+                        Notification.requestPermission().then(p => {{ if (p==='granted') {{ new Notification("New Chat Message", {{ body: "You have a new group chat message." }}); }} }});
+                    }}
+                }}
+                function checkChat() {{
+                    const last = parseInt(window.localStorage.getItem(msgKey) || '0');
+                    if (unreadMsgs > last) {{
+                        notifyNewMsg();
+                    }}
+                    window.localStorage.setItem(msgKey, unreadMsgs);
+                }}
+                checkChat();
+                </script>
+                '''
+                components.html(js_chat, height=0)
+
             # --- Auto-update & browser notification for admin when new request is added ---
             if st.session_state.role == "admin":
                 # Server-side rerun every 15 s keeps data fresh without a full tab reload
@@ -4236,4 +4268,3 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
-
