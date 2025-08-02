@@ -2524,7 +2524,7 @@ init_break_session_state()
 if not st.session_state.authenticated:
     st.markdown("""
         <div class="login-container">
-            <h1 style="text-align: center; margin-bottom: 2rem;">💠 Lyca Management System</h1>
+            <h1 style="text-align: center; margin-bottom: 2rem;">Lyca Management System</h1>
     """, unsafe_allow_html=True)
     
     with st.form("login_form"):
