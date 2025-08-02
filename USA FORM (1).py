@@ -1573,17 +1573,6 @@ def agent_break_dashboard():
                     components.html(js_code_notify, height=0)
                     st.session_state[notification_key] = True
 
-        # Component to trigger rerun every 60 seconds
-        rerun_component_breaks = components.declare_component("rerun_component_breaks", code='''
-            function(element, args) {
-                if (!window.breakRerunInterval) {
-                    window.breakRerunInterval = setInterval(() => {
-                        Streamlit.setComponentValue({rerun: true});
-                    }, 60000);
-                }
-            }
-        ''')
-
         if rerun_component_breaks(key='break_rerun'):
             st.rerun()
         return
@@ -2472,10 +2461,6 @@ def inject_custom_css():
         
         .theme-toggle label {{
             margin-right: 0.5rem;
-            color: {c['text']};
-        }}
-    </style>
-    """, unsafe_allow_html=True)
 
 st.set_page_config(
     page_title="Lyca Management System",
@@ -2483,6 +2468,28 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- Component Declarations ---
+# Declare components at the top level so they are not re-declared on every script run.
+rerun_component_admin = components.declare_component("rerun_component_admin", code='''
+    function(element, args) {
+        if (!window.adminRerunInterval) {
+            window.adminRerunInterval = setInterval(() => {
+                Streamlit.setComponentValue({rerun: true});
+            }, 15000); // Rerun every 15 seconds for admin
+        }
+    }
+''')
+
+rerun_component_breaks = components.declare_component("rerun_component_breaks", code='''
+    function(element, args) {
+        if (!window.breakRerunInterval) {
+            window.breakRerunInterval = setInterval(() => {
+                Streamlit.setComponentValue({rerun: true});
+            }, 60000); // Rerun every 60 seconds for breaks
+        }
+    }
+''')
 
 # Custom sidebar background color and text color for light/dark mode
 sidebar_bg = '#ffffff' if st.session_state.get('color_mode', 'light') == 'light' else '#1e293b'
@@ -2704,20 +2711,8 @@ else:
                     components.html(js_code_notify, height=0)
                 st.session_state.last_pending_requests = pending_requests
 
-                # Component to trigger rerun every 15 seconds
-                rerun_component = components.declare_component("rerun_component_admin", code='''
-                    function(element, args) {
-                        if (!window.adminRerunInterval) {
-                            window.adminRerunInterval = setInterval(() => {
-                                Streamlit.setComponentValue({rerun: true});
-                            }, 15000);
-                        }
-                        // We don't need to render anything.
-                    }
-                ''')
-                
                 # When the component sends a value, rerun the app
-                if rerun_component(key='admin_rerun'):
+                if rerun_component_admin(key='admin_rerun'):
                     st.rerun()
 
         
