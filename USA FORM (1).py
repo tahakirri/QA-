@@ -222,7 +222,7 @@ def init_db():
         """)
 
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS late_logins (
+            CREATE TABLE IF NOT EXISTS LATE LOGINs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 agent_name TEXT,
                 presence_time TEXT,
@@ -744,7 +744,7 @@ def clear_all_group_messages():
     finally:
         conn.close()
 
-def add_late_login(agent_name, presence_time, login_time, reason):
+def add_LATE LOGIN(agent_name, presence_time, login_time, reason):
     if is_killswitch_enabled():
         st.error("System is currently locked. Please contact the developer.")
         return False
@@ -753,7 +753,7 @@ def add_late_login(agent_name, presence_time, login_time, reason):
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO late_logins (agent_name, presence_time, login_time, reason, timestamp) 
+            INSERT INTO LATE LOGINs (agent_name, presence_time, login_time, reason, timestamp) 
             VALUES (?, ?, ?, ?, ?)
         """, (agent_name, presence_time, login_time, reason, get_casablanca_time()))
         conn.commit()
@@ -761,11 +761,11 @@ def add_late_login(agent_name, presence_time, login_time, reason):
     finally:
         conn.close()
 
-def get_late_logins():
+def get_LATE LOGINs():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM late_logins ORDER BY timestamp DESC")
+        cursor.execute("SELECT * FROM LATE LOGINs ORDER BY timestamp DESC")
         return cursor.fetchall()
     finally:
         conn.close()
@@ -826,7 +826,7 @@ def get_midshift_issues():
     finally:
         conn.close()
 
-def clear_late_logins():
+def clear_LATE LOGINs():
     if is_killswitch_enabled():
         st.error("System is currently locked. Please contact the developer.")
         return False
@@ -834,7 +834,7 @@ def clear_late_logins():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM late_logins")
+        cursor.execute("DELETE FROM LATE LOGINs")
         conn.commit()
         return True
     except Exception as e:
@@ -2648,7 +2648,7 @@ else:
                 ("📊 Live KPIs ", "Live KPIs"),
                 ("❌ Mistakes", "mistakes"),
                 ("💬 Chat", "chat"),
-                ("⏰ Late Login", "late_login"),
+                ("⏰ Late Login", "LATE LOGIN"),
                 ("📞 Quality Issues", "quality_issues"),
                 ("🔄 Mid-shift Issues", "midshift_issues"),
                 ("💎 Fancy Number", "fancy_number")
@@ -3200,7 +3200,7 @@ else:
         st.subheader("⏰ Late Login Report")
         
         if not is_killswitch_enabled():
-            with st.form("late_login_form"):
+            with st.form("LATE LOGIN_form"):
                 cols = st.columns(3)
                 presence_time = cols[0].text_input("Time of presence (HH:MM)", placeholder="08:30")
                 login_time = cols[1].text_input("Time of log in (HH:MM)", placeholder="09:15")
@@ -3216,7 +3216,7 @@ else:
                     try:
                         datetime.strptime(presence_time, "%H:%M")
                         datetime.strptime(login_time, "%H:%M")
-                        add_late_login(
+                        add_LATE LOGIN(
                             st.session_state.username,
                             presence_time,
                             login_time,
@@ -3227,21 +3227,21 @@ else:
                         st.error("Invalid time format. Please use HH:MM format (e.g., 08:30)")
         
         st.subheader("Late Login Records")
-        late_logins = get_late_logins()
+        LATE LOGINs = get_LATE LOGINs()
         
         if st.session_state.role == "admin":
             # Search and date filter only for admin users
             col1, col2 = st.columns([2, 1])
             with col1:
-                search_query = st.text_input("🔍 Search late login records...", key="late_login_search")
+                search_query = st.text_input("🔍 Search late login records...", key="LATE LOGIN_search")
             with col2:
-                start_date = st.date_input("Start date", key="late_login_start_date")
-                end_date = st.date_input("End date", key="late_login_end_date")
+                start_date = st.date_input("Start date", key="LATE LOGIN_start_date")
+                end_date = st.date_input("End date", key="LATE LOGIN_end_date")
 
             # Filtering logic
             if search_query or start_date or end_date:
                 filtered_logins = []
-                for login in late_logins:
+                for login in LATE LOGINs:
                     matches_search = True
                     matches_date = True
                     
@@ -3268,11 +3268,11 @@ else:
                     # else: no date filter
                     if matches_search and matches_date:
                         filtered_logins.append(login)
-                late_logins = filtered_logins
+                LATE LOGINs = filtered_logins
             
-            if late_logins:
+            if LATE LOGINs:
                 data = []
-                for login in late_logins:
+                for login in LATE LOGINs:
                     _, agent, presence, login_time, reason, ts = login
                     data.append({
                         "Agent's Name": agent,
@@ -3287,11 +3287,11 @@ else:
                 csv = df.to_csv(index=False).encode('utf-8')
                 # File name logic
                 if start_date and end_date:
-                    fname = f"late_logins_{start_date}_to_{end_date}.csv"
+                    fname = f"LATE LOGINs_{start_date}_to_{end_date}.csv"
                 elif start_date:
-                    fname = f"late_logins_{start_date}.csv"
+                    fname = f"LATE LOGINs_{start_date}.csv"
                 else:
-                    fname = "late_logins_all.csv"
+                    fname = "LATE LOGINs_all.csv"
                 st.download_button(
                     label="Download as CSV",
                     data=csv,
@@ -3299,28 +3299,28 @@ else:
                     mime="text/csv"
                 )
                 
-                if 'confirm_clear_late_login' not in st.session_state:
-                    st.session_state.confirm_clear_late_login = False
-                if not st.session_state.confirm_clear_late_login:
+                if 'confirm_clear_LATE LOGIN' not in st.session_state:
+                    st.session_state.confirm_clear_LATE LOGIN = False
+                if not st.session_state.confirm_clear_LATE LOGIN:
                     if st.button("Clear All Records"):
-                        st.session_state.confirm_clear_late_login = True
+                        st.session_state.confirm_clear_LATE LOGIN = True
                 else:
                     st.warning("⚠️ Are you sure you want to clear all late login records? This cannot be undone!")
                     col1, col2 = st.columns([1, 1])
                     with col1:
                         if st.button("Yes, Clear All Late Logins"):
-                            clear_late_logins()
-                            st.session_state.confirm_clear_late_login = False
+                            clear_LATE LOGINs()
+                            st.session_state.confirm_clear_LATE LOGIN = False
                             st.rerun()
                     with col2:
                         if st.button("Cancel"):
-                            st.session_state.confirm_clear_late_login = False
+                            st.session_state.confirm_clear_LATE LOGIN = False
                             st.rerun()
             else:
                 st.info("No late login records found")
         else:
             # Regular users only see their own records without search
-            user_logins = [login for login in late_logins if login[1] == st.session_state.username]
+            user_logins = [login for login in LATE LOGINs if login[1] == st.session_state.username]
             if user_logins:
                 data = []
                 for login in user_logins:
@@ -3703,7 +3703,7 @@ else:
                 "Mistakes": clear_all_mistakes,
                 "Chat Messages": clear_all_group_messages,
                 "HOLD Images": clear_hold_images,
-                "Late Logins": clear_late_logins,
+                "Late Logins": clear_LATE LOGINs,
                 "Quality Issues": clear_quality_issues,
                 "Mid-shift Issues": clear_midshift_issues,
                 "ALL System Data": lambda: all([
@@ -3711,7 +3711,7 @@ else:
                     clear_all_mistakes(),
                     clear_all_group_messages(),
                     clear_hold_images(),
-                    clear_late_logins(),
+                    clear_LATE LOGINs(),
                     clear_quality_issues(),
                     clear_midshift_issues()
                 ])
@@ -4236,5 +4236,6 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
+
 
 
