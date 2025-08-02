@@ -2644,7 +2644,7 @@ else:
         elif st.session_state.role in ["admin", "agent"]:
             nav_options.extend([
                 ("📋 Requests", "requests"),
-                ("☕ Breaks", "breaks"),
+                ("🍩 Breaks", "breaks"),
                 ("📊 Live KPIs ", "Live KPIs"),
                 ("❌ Mistakes", "mistakes"),
                 ("💬 Chat", "chat"),
@@ -4238,6 +4238,7 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
+
 
 
 
