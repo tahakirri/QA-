@@ -2756,7 +2756,7 @@ else:
                 # server-side rerun every 15s for fresh message count (lightweight)
                 try:
                     from streamlit_autorefresh import st_autorefresh  # type: ignore
-                    st_autorefresh(interval=1000, key="agent_chat_autorefresh")
+                    st_autorefresh(interval=15000, key="agent_chat_autorefresh")
                 except ImportError:
                     pass
                 import streamlit.components.v1 as components
@@ -2788,7 +2788,7 @@ else:
                 # Server-side rerun every 15 s keeps data fresh without a full tab reload
                 try:
                     from streamlit_autorefresh import st_autorefresh  # type: ignore
-                    st_autorefresh(interval=1000, key="admin_autorefresh")
+                    st_autorefresh(interval=15000, key="admin_autorefresh")
                 except ImportError:
                     # Package not available – skip (notifications will still work on manual interaction)
                     pass
