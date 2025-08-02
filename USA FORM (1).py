@@ -371,6 +371,16 @@ def get_requests():
     finally:
         conn.close()
 
+def get_latest_request():
+    """Get the most recent request from the database"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM requests ORDER BY timestamp DESC LIMIT 1")
+        return cursor.fetchone()
+    finally:
+        conn.close()
+
 def search_requests(query):
     conn = get_db_connection()
     try:
@@ -2537,6 +2547,15 @@ if not st.session_state.authenticated:
             <h1 style="text-align: center; margin-bottom: 2rem;">💠 Lyca Management System</h1>
     """, unsafe_allow_html=True)
     
+    # Handle AJAX request for latest requester
+    if st.experimental_get_query_params().get('get_latest_requester') == ['true']:
+        latest_request = get_latest_request()
+        if latest_request:
+            st.json({"requester": latest_request[1]})  # index 1 is the agent_name
+        else:
+            st.json({"requester": None})
+        st.stop()
+
     with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
