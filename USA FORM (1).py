@@ -363,6 +363,20 @@ def update_request_status(request_id, completed):
     finally:
         conn.close()
 
+def get_requests():
+    """Fetch all requests from the database."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, agent_name, request_type, identifier, comment, timestamp, completed, group_name 
+            FROM requests 
+            ORDER BY timestamp DESC
+        """)
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
 def add_request_comment(request_id, user, comment):
     if is_killswitch_enabled():
         st.error("System is currently locked. Please contact the developer.")
