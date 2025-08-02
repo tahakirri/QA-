@@ -325,6 +325,46 @@ def toggle_chat_killswitch(enable):
         cursor = conn.cursor()
         cursor.execute("UPDATE system_settings SET chat_killswitch_enabled = ? WHERE id = 1",
                       (1 if enable else 0,))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+def add_request(agent_name, request_type, identifier, comment, group_name=None):
+    if is_killswitch_enabled():
+        st.error("System is currently locked. Please contact the developer.")
+        return False
+        
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        timestamp = get_casablanca_time()
+        if group_name is not None:
+            cursor.execute("""
+                INSERT INTO requests (agent_name, request_type, identifier, comment, timestamp, group_name) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (agent_name, request_type, identifier, comment, timestamp, group_name))
+        else:
+            cursor.execute("""
+                INSERT INTO requests (agent_name, request_type, identifier, comment, timestamp) 
+                VALUES (?, ?, ?, ?, ?)
+            """, (agent_name, request_type, identifier, comment, timestamp))
+        
+        request_id = cursor.lastrowid
+        
+        cursor.execute("""
+            INSERT INTO request_comments (request_id, user, comment, timestamp)
+            VALUES (?, ?, ?, ?)
+        """, (request_id, agent_name, f"Request created: {comment}", timestamp))
+        
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+def get_requests():
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM requests ORDER BY timestamp DESC")
         return cursor.fetchall()
@@ -360,20 +400,6 @@ def update_request_status(request_id, completed):
                       (1 if completed else 0, request_id))
         conn.commit()
         return True
-    finally:
-        conn.close()
-
-def get_requests():
-    """Fetch all requests from the database."""
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, agent_name, request_type, identifier, comment, timestamp, completed, group_name 
-            FROM requests 
-            ORDER BY timestamp DESC
-        """)
-        return cursor.fetchall()
     finally:
         conn.close()
 
@@ -2794,51 +2820,23 @@ else:
                             break
                 group_filter = st.session_state.group_name
             with st.expander("➕ Submit New Request"):
-                with st.form("request_form", clear_on_submit=True):
+                with st.form("request_form"):
                     cols = st.columns([1, 3])
                     request_type = cols[0].selectbox("Type", ["Email", "Phone", "Ticket"])
                     identifier = cols[1].text_input("Identifier")
-                    
-                    # Add emoji picker button
-                    emoji_cols = st.columns([6, 1])
-                    with emoji_cols[0]:
-                        comment = st.text_area("Comment (supports markdown)", 
-                                             help="You can use markdown formatting like **bold**, *italic*, `code`, etc.")
-                    
-                    with emoji_cols[1]:
-                        st.markdown("<br><br>", unsafe_allow_html=True)
-                        if st.button("😊", key="emoji_picker_btn", help="Add emoji"):
-                            st.session_state.show_emoji_picker = not st.session_state.get('show_emoji_picker', False)
-                        
-                        if st.session_state.get('show_emoji_picker', False):
-                            emoji_cols = st.columns(6)
-                            emojis = ["😀", "😃", "😄", "😁", "😆", "😅", 
-                                     "😂", "🤣", "😊", "😇", "🙂", "🙃", 
-                                     "😉", "😌", "😍", "🥰", "😘", "😗"]
-                            
-                            for i, emoji in enumerate(emojis):
-                                if emoji_cols[i % 6].button(emoji, key=f"emoji_{i}"):
-                                    st.session_state.request_comment = st.session_state.get('request_comment', '') + emoji
-                                    st.session_state.show_emoji_picker = False
-                                    st.rerun()
-                    
-                    # File uploader
-                    uploaded_files = st.file_uploader("Attach files (screenshots, etc.)", 
-                                                    accept_multiple_files=True,
-                                                    type=['png', 'jpg', 'jpeg', 'pdf', 'txt', 'doc', 'docx'])
-                    
+                    comment = st.text_area("Comment")
                     if st.form_submit_button("Submit"):
                         if identifier and comment:
                             # Determine group for request
                             if st.session_state.role == "admin":
+                                # Admins can select any group
                                 all_groups = list(set([u[3] for u in get_all_users() if u[3]]))
                                 if all_groups:
-                                    selected_group = st.selectbox("Assign Request to Group", all_groups, 
-                                                                key="admin_request_group_submit")
-                                    group_for_request = selected_group
+                                    selected_group = st.selectbox("Assign Request to Group", all_groups, key="admin_request_group_submit")
                                 else:
                                     st.warning("No groups available. Please create a group first.")
-                                    group_for_request = None
+                                    selected_group = None
+                                group_for_request = selected_group
                             else:
                                 # Agents use their own group
                                 user_group = None
@@ -2847,26 +2845,13 @@ else:
                                         user_group = u[3]
                                         break
                                 group_for_request = user_group
-                            
                             if group_for_request:
-                                # Save the request and get the request_id
-                                request_id = add_request(st.session_state.username, request_type, identifier, comment, group_for_request)
-                                if request_id:
-                                    # Save attachments if any
-                                    if uploaded_files:
-                                        for uploaded_file in uploaded_files:
-                                            add_request_attachment(
-                                                request_id,
-                                                uploaded_file.read(),
-                                                uploaded_file.name,
-                                                uploaded_file.type
-                                            )
-                                    
+                                if add_request(st.session_state.username, request_type, identifier, comment, group_for_request):
                                     st.success("Request submitted successfully!")
                                     st.rerun()
                             else:
                                 st.error("Please select a group for the request.")
-                    
+        
             st.subheader("🔍 Search Requests")
             search_query = st.text_input("Search requests...")
             # Filter requests by group
@@ -2894,56 +2879,9 @@ else:
                     cols = st.columns([0.1, 0.9])
                     with cols[0]:
                         st.checkbox("Done", value=bool(completed), 
-                                 key=f"check_{req_id}", 
-                                 on_change=update_request_status,
-                                 args=(req_id, not completed))
-                    
-                    with cols[1]:
-                        # Display comment with markdown support
-                        st.markdown(comment)
-                        
-                        # Show attachments if any
-                        attachments = get_request_attachments(req_id)
-                        if attachments:
-                            st.write("**Attachments:**")
-                            for att_id, filename, content_type, uploaded_at in attachments:
-                                if content_type.startswith('image/'):
-                                    # For images, show a preview
-                                    st.image(
-                                        get_attachment_data(att_id)[2], 
-                                        caption=filename,
-                                        width=300  # Adjust width as needed
-                                    )
-                                else:
-                                    # For other files, show a download button
-                                    st.download_button(
-                                        label=f"📄 {filename}",
-                                        data=get_attachment_data(att_id)[2],
-                                        file_name=filename,
-                                        mime=content_type,
-                                        key=f"dl_{att_id}"
-                                    )
-                        
-                        st.caption(f"**{agent}** · {req_type} · {identifier} · {timestamp}")
-                        
-                        # Add comment form
-                        with st.expander("💬 Add Comment", expanded=False):
-                            with st.form(key=f"comment_form_{req_id}"):
-                                new_comment = st.text_area("Your comment", key=f"comment_{req_id}", 
-                                                         help="You can use markdown and emojis in your comment")
-                                if st.form_submit_button("Post Comment"):
-                                    if new_comment:
-                                        add_request_comment(req_id, st.session_state.username, new_comment)
-                                        st.rerun()
-                        
-                        # Show existing comments
-                        comments = get_request_comments(req_id)
-                        if comments:
-                            st.write("**Comments:**")
-                            for comment in comments:
-                                st.markdown(f"**{comment[1]}** ({comment[3]}): {comment[2]}")
-                        
-                        st.write("---")
+                                   key=f"check_{req_id}", 
+                                   on_change=update_request_status,
+                                   args=(req_id, not completed))
                     with cols[1]:
                         st.markdown(f"""
                         <div class="card">
@@ -3093,61 +3031,10 @@ else:
                 .chat-message {display: flex; align-items: flex-start; margin-bottom: 12px;}
                 .chat-message.sent {flex-direction: row-reverse;}
                 .chat-message .message-avatar {width: 36px; height: 36px; background: #3b82f6; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; margin: 0 10px;}
-                .chat-message .message-content {background: #fff; border-radius: 6px; padding: 8px 14px; min-width: 80px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); white-space: pre-wrap; word-break: break-word;}
+                .chat-message .message-content {background: #fff; border-radius: 6px; padding: 8px 14px; min-width: 80px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);}
                 .chat-message.sent .message-content {background: #dbeafe;}
                 .chat-message .message-meta {font-size: 0.8rem; color: #64748b; margin-top: 2px;}
-                .emoji-picker {position: absolute; bottom: 100%; right: 0; background: white; border: 1px solid #ddd; border-radius: 8px; padding: 8px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none;}
-                .emoji-picker.open {display: block;}
-                .emoji-option {font-size: 1.5em; padding: 4px; cursor: pointer; display: inline-block;}
-                .emoji-option:hover {background: #f0f0f0; border-radius: 4px;}
-                .emoji-trigger {cursor: pointer; font-size: 1.5em; padding: 0 10px; display: flex; align-items: center;}
                 </style>''', unsafe_allow_html=True)
-                
-                # Add emoji picker HTML
-                st.markdown('''
-                <div id="emoji-picker" class="emoji-picker">
-                    <div class="emoji-option">😀</div>
-                    <div class="emoji-option">😃</div>
-                    <div class="emoji-option">😄</div>
-                    <div class="emoji-option">😁</div>
-                    <div class="emoji-option">😆</div>
-                    <div class="emoji-option">😅</div>
-                    <div class="emoji-option">😂</div>
-                    <div class="emoji-option">🤣</div>
-                    <div class="emoji-option">😊</div>
-                    <div class="emoji-option">😇</div>
-                    <div class="emoji-option">🙂</div>
-                    <div class="emoji-option">🙃</div>
-                    <div class="emoji-option">😉</div>
-                    <div class="emoji-option">😌</div>
-                    <div class="emoji-option">😍</div>
-                    <div class="emoji-option">🥰</div>
-                    <div class="emoji-option">😘</div>
-                    <div class="emoji-option">😗</div>
-                </div>
-                <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    // Emoji picker functionality
-                    const emojiOptions = document.querySelectorAll('.emoji-option');
-                    emojiOptions.forEach(emoji => {
-                        emoji.addEventListener('click', function() {
-                            const textarea = document.querySelector('.chat-input textarea');
-                            if (textarea) {
-                                const start = textarea.selectionStart;
-                                const end = textarea.selectionEnd;
-                                const text = textarea.value;
-                                const before = text.substring(0, start);
-                                const after = text.substring(end, text.length);
-                                textarea.value = before + emoji.textContent + after;
-                                textarea.selectionStart = textarea.selectionEnd = start + emoji.textContent.length;
-                                textarea.focus();
-                            }
-                        });
-                    });
-                });
-                </script>
-                ''', unsafe_allow_html=True)
-                
                 st.markdown('<div class="chat-container">', unsafe_allow_html=True)
                 # Chat message rendering
                 for msg in reversed(messages):
@@ -3181,63 +3068,30 @@ else:
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)  # Close chat container
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                # Chat input form (no emoji picker)
                 with st.form("chat_form", clear_on_submit=True):
-                    # Main message input with emoji picker
-                    msg_cols = st.columns([10, 1])
-                    with msg_cols[0]:
-                        message = st.text_area("Type your message...", 
-                                            key=f"chat_input_{group_filter}", 
-                                            label_visibility="collapsed",
-                                            height=80)
-                        
-                    with msg_cols[1]:
-                        # Emoji picker button
-                        st.markdown("<div style='display: flex; flex-direction: column; gap: 5px;'>"
-                                    f"<button type='button' id='emoji-trigger' class='emoji-trigger' style='background: none; border: none; cursor: pointer; font-size: 1.5rem;'>😊</button>"
-                                    "<button type='submit' style='background: none; border: none; cursor: pointer; font-size: 1.5rem;'>💬</button>"
-                                    "</div>", 
-                                    unsafe_allow_html=True)
-                    
-                    # Add JavaScript for emoji picker
-                    st.markdown('''
-                    <script>
-                    // Toggle emoji picker
-                    document.getElementById('emoji-trigger').addEventListener('click', function() {
-                        const picker = document.getElementById('emoji-picker');
-                        picker.classList.toggle('open');
-                    });
-                    
-                    // Close emoji picker when clicking outside
-                    document.addEventListener('click', function(event) {
-                        const picker = document.getElementById('emoji-picker');
-                        const trigger = document.getElementById('emoji-trigger');
-                        if (!picker.contains(event.target) && event.target !== trigger) {
-                            picker.classList.remove('open');
-                        }
-                    });
-                    </script>
-                    ''', unsafe_allow_html=True)
-                    
-                    if st.form_submit_button("Send", use_container_width=True):
-                        if message.strip():
-                            # For admin: use selected group, for agents: use their assigned group
-                            if st.session_state.role == "admin":
-                                send_to_group = group_filter
-                            else:
-                                # Look up the user's group
-                                send_to_group = None
-                                for u in get_all_users():
-                                    if u[1] == st.session_state.username:
-                                        send_to_group = u[3]
-                                        break
-                            
-                            if send_to_group:
-                                if send_group_message(st.session_state.username, message, send_to_group):
-                                    st.session_state.show_emoji_picker = False
-                                    st.rerun()
-                            else:
-                                st.warning("No group selected for chat.")
+                    message = st.text_input("Type your message...", key="chat_input")
+                    col1, col2 = st.columns([5,1])
+                    with col2:
+                        if st.form_submit_button("Send"):
+                            if message:
+                                # Admin: send to selected group; Agent: always look up group from users table
+                                if st.session_state.role == "admin":
+                                    send_to_group = group_filter
+                                else:
+                                    # Always look up the user's group from the users table
+                                    send_to_group = None
+                                    for u in get_all_users():
+                                        if u[1] == st.session_state.username:
+                                            send_to_group = u[3]
+                                            break
+                                if send_to_group:
+                                    send_group_message(st.session_state.username, message, send_to_group)
+                                else:
+                                    st.warning("No group selected for chat.")
+                                st.rerun()
         else:
             st.error("System is currently locked. Access to chat is disabled.")
 
