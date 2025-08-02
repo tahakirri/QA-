@@ -1593,8 +1593,8 @@ def agent_break_dashboard():
         if (!window.breakNotificationInterval) {{
             console.log('Starting break notification poller.');
             window.breakNotificationInterval = setInterval(() => {{
-                // Reload to get fresh server time
-                top.location.reload();
+                // Simply re-run the notification check without reloading the page
+                checkAndNotifyBreaks();
             }}, 60000); // Check every minute
         }}
 
