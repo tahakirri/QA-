@@ -1533,6 +1533,62 @@ def agent_break_dashboard():
                     st.write(f"**{display_name}:** {bookings[break_type]['time']}")
                 else:
                     st.write(f"**{display_name}:** {bookings[break_type]}")
+
+        # --- Inject browser notification for breaks 5 min before ---
+        import streamlit.components.v1 as components
+        import json
+        # Gather break times for today (format: HH:MM)
+        break_times = []
+        for break_type in ['lunch', 'early_tea', 'late_tea']:
+            if break_type in bookings and isinstance(bookings[break_type], dict):
+                t = bookings[break_type].get('time')
+                if t:
+                    break_times.append(t)
+        # Pass current date and break times to JS
+        js_code = f'''
+        <script>
+        const breakTimes = {json.dumps(break_times)};
+        const today = "{current_date}";
+        function toMinutes(t) {{
+            const [h, m] = t.split(":").map(Number);
+            return h * 60 + m;
+        }}
+        function checkBreaks() {{
+            const now = new Date();
+            // Casablanca offset (UTC+1 or UTC+0 with DST)
+            // For accuracy, backend should pass the correct date/time, but we'll use local for now.
+            const nowMinutes = now.getHours() * 60 + now.getMinutes();
+            breakTimes.forEach((bt) => {{
+                const [h, m] = bt.split(":").map(Number);
+                const breakMinutes = h * 60 + m;
+                if (breakMinutes - nowMinutes === 5) {{
+                    // Only notify once per break
+                    if (!window.notifiedBreaks) window.notifiedBreaks = {{}};
+                    if (!window.notifiedBreaks[bt + today]) {{
+                        if (Notification.permission === "granted") {{
+                            new Notification("Break Reminder", {{
+                                body: `Your break at ${bt} is in 5 minutes!`
+                            }});
+                        }} else if (Notification.permission !== "denied") {{
+                            Notification.requestPermission().then((perm) => {{
+                                if (perm === "granted") {{
+                                    new Notification("Break Reminder", {{
+                                        body: `Your break at ${bt} is in 5 minutes!`
+                                    }});
+                                }}
+                            }});
+                        }}
+                        window.notifiedBreaks[bt + today] = true;
+                    }}
+                }}
+            }});
+        }}
+        setInterval(checkBreaks, 60000);
+        // Also run on load
+        checkBreaks();
+        </script>
+        '''
+        components.html(js_code, height=0)
         return
     
     # Determine agent's assigned templates
@@ -2627,6 +2683,43 @@ else:
                 ">💬 Unread messages: {unread_messages}</p>
             </div>
             """, unsafe_allow_html=True)
+
+            # --- Inject browser notification for admin when new request is added ---
+            if st.session_state.role == "admin":
+                import streamlit.components.v1 as components
+                js_code = f'''
+                <script>
+                const currentPending = {pending_requests};
+                const key = 'lastPendingRequests';
+                function notifyNewRequest() {{
+                    if (Notification.permission === "granted") {{
+                        new Notification("New Request", {{
+                            body: "A new request has been submitted."
+                        }});
+                    }} else if (Notification.permission !== "denied") {{
+                        Notification.requestPermission().then((perm) => {{
+                            if (perm === "granted") {{
+                                new Notification("New Request", {{
+                                    body: "A new request has been submitted."
+                                }});
+                            }}
+                        }});
+                    }}
+                }}
+                function pollRequests() {{
+                    let last = parseInt(window.localStorage.getItem(key) || '0');
+                    if (currentPending > last) {{
+                        notifyNewRequest();
+                    }}
+                    window.localStorage.setItem(key, currentPending);
+                }}
+                setInterval(pollRequests, 10000);
+                // Run on load
+                pollRequests();
+                </script>
+                '''
+                components.html(js_code, height=0)
+
         
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.authenticated = False
