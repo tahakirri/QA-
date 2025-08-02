@@ -2853,23 +2853,10 @@ else:
                             else:
                                 st.error("Please select a group for the request.")
                     
-                st.subheader("🔍 Search Requests")
-                search_query = st.text_input("Search requests...")
-                # Filter requests by group
-                if st.session_state.role == "admin":
-                    # Admin can filter by any group
-                    if group_filter:
-                        all_requests = search_requests(search_query) if search_query else get_requests()
-                        requests = [r for r in all_requests if (len(r) > 7 and r[7] == group_filter)]
-                    else:
-                        requests = search_requests(search_query) if search_query else get_requests()
-                else:
-                    # Agents can only see their own group, regardless of filter
-                    user_group = None
-                    for u in get_all_users():
-                        if u[1] == st.session_state.username:
-                            user_group = u[3]
-                            break
+            st.subheader("🔍 Search Requests")
+            search_query = st.text_input("Search requests...")
+            # Filter requests by group
+            if st.session_state.role == "admin":
                 # Admin can filter by any group
                 if group_filter:
                     all_requests = search_requests(search_query) if search_query else get_requests()
