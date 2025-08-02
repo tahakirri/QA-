@@ -2663,31 +2663,20 @@ else:
                                  if m[0] not in st.session_state.last_message_ids 
                                  and m[1] != st.session_state.username])
             
-            st.markdown(f"""
-            <div style="
-                background-color: {'#1e293b' if st.session_state.color_mode == 'dark' else '#ffffff'};
-                padding: 1rem;
-                border-radius: 0.5rem;
-                border: 1px solid {'#334155' if st.session_state.color_mode == 'dark' else '#e2e8f0'};
-                margin-bottom: 20px;
-            ">
-                <h4 style="
-                    color: {'#e2e8f0' if st.session_state.color_mode == 'dark' else '#1e293b'};
-                    margin-bottom: 1rem;
-                ">🔔 Notifications</h4>
-                <p style="
-                    color: {'#94a3b8' if st.session_state.color_mode == 'dark' else '#475569'};
-                    margin-bottom: 0.5rem;
-                ">📋 Pending requests: {pending_requests}</p>
-                <p style="
-                    color: {'#94a3b8' if st.session_state.color_mode == 'dark' else '#475569'};
-                    margin-bottom: 0.5rem;
-                ">❌ Recent mistakes: {new_mistakes}</p>
-                <p style="
-                    color: {'#94a3b8' if st.session_state.color_mode == 'dark' else '#475569'};
-                ">💬 Unread messages: {unread_messages}</p>
+            bg_color = '#1e293b' if st.session_state.color_mode == 'dark' else '#ffffff'
+            border_color = '#334155' if st.session_state.color_mode == 'dark' else '#e2e8f0'
+            title_color = '#e2e8f0' if st.session_state.color_mode == 'dark' else '#1e293b'
+            text_color = '#94a3b8' if st.session_state.color_mode == 'dark' else '#475569'
+
+            notif_html = f"""
+            <div style="background-color:{bg_color}; padding:1rem; border-radius:0.5rem; border:1px solid {border_color}; margin-bottom:20px;">
+                <h4 style="color:{title_color}; margin-bottom:1rem;">Notifications</h4>
+                <p style="color:{text_color}; margin-bottom:0.5rem;">Pending requests: {pending_requests}</p>
+                <p style="color:{text_color}; margin-bottom:0.5rem;">Recent mistakes: {new_mistakes}</p>
+                <p style="color:{text_color};">Unread messages: {unread_messages}</p>
             </div>
-            """, unsafe_allow_html=True)
+            """
+            st.markdown(notif_html, unsafe_allow_html=True)
 
             # --- Rerun logic for admin to check for new requests ---
             if st.session_state.role == "admin":
