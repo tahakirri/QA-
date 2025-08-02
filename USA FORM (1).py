@@ -2656,6 +2656,7 @@ else:
         
         # Add admin option for admin users
         if st.session_state.role == "admin":
+            nav_options.append(("🗓️ Calendar", "calendar"))
             nav_options.append(("⚙️ Admin", "admin"))
         
         for option, value in nav_options:
@@ -2803,6 +2804,38 @@ else:
             st.rerun()
 
     st.title(st.session_state.current_section.title())
+
+    # --- Admin Calendar View for Bookings ---
+    if st.session_state.current_section == "calendar" and st.session_state.role == "admin":
+        try:
+            from streamlit_calendar import calendar
+            import pytz
+            from datetime import datetime, timedelta
+            import json
+            def build_break_events():
+                tz = pytz.timezone("Africa/Casablanca")
+                events = []
+                bookings = st.session_state.get('agent_bookings', {})
+                for date_str, agents in bookings.items():
+                    for agent, breaks in agents.items():
+                        for btype, meta in breaks.items():
+                            if not isinstance(meta, dict):
+                                continue
+                            start_dt = datetime.strptime(f"{date_str} {meta['time']}", "%Y-%m-%d %H:%M").astimezone(tz)
+                            dur = timedelta(minutes=30 if btype=="lunch" else 15)
+                            events.append({
+                                "title": f"{agent} – {btype.replace('_',' ').title()}",
+                                "start": start_dt.isoformat(),
+                                "end":   (start_dt + dur).isoformat(),
+                                "color": "#16a34a" if btype=="lunch" else "#f97316",
+                            })
+                return events
+            events = build_break_events()
+            st.info("This calendar shows all confirmed agent breaks. Click events for details.")
+            calendar(events=events, options={"initialView": "timeGridWeek", "headerToolbar": {"left": "prev,next today","center": "title","right": "dayGridMonth,timeGridWeek,timeGridDay"}})
+        except ImportError:
+            st.error("streamlit-calendar is not installed. Please add it to requirements.txt.")
+        return
 
     if st.session_state.current_section == "requests":
         if not is_killswitch_enabled():
@@ -3205,12 +3238,11 @@ else:
                 presence_time = cols[0].text_input("Time of presence (HH:MM)", placeholder="08:30")
                 login_time = cols[1].text_input("Time of log in (HH:MM)", placeholder="09:15")
                 reason = cols[2].selectbox("Reason", [
-                    "Disconnected RC",
-                    "Frozen Ring",
-                    "PC ISSUE",
-                    "RC Extension issue",
-                    "Ring Central issue",
-                    "Windows issue"
+                    "Workspace Issue",
+                    "Avaya Issue",
+                    "Aaad Tool",
+                    "Windows Issue",
+                    "Reset Password"
                 ])
                 
                 if st.form_submit_button("Submit"):
@@ -3345,11 +3377,10 @@ else:
             with st.form("quality_issue_form"):
                 cols = st.columns(4)
                 issue_type = cols[0].selectbox("Type of issue", [
-                "Audio Issue",
-                "Call Drop From Rc",
-                "Call Frozen",
-                "CRM Issue",
-                "Hold Frozen"
+                    "Blocage Physical Avaya",
+                    "Hold Than Call Drop",
+                    "Call Drop From Workspace",
+                    "Wrong Space Frozen"
                 ])
                 timing = cols[1].text_input("Timing (HH:MM)", placeholder="14:30")
                 mobile_number = cols[2].text_input("Mobile number")
@@ -3510,12 +3541,12 @@ else:
             with st.form("midshift_issue_form"):
                 cols = st.columns(3)
                 issue_type = cols[0].selectbox("Issue Type", [
-                "Extension issue",
-                "Windows Issue",
-                "PC Issue",
-                "Disconnected RC",
-                "Frozen Ring"
-
+                    "Default Not Ready",
+                    "Frozen Workspace",
+                    "Physical Avaya",
+                    "Pc Issue",
+                    "Aaad Tool",
+                    "Disconnected Avaya"
                 ])
                 start_time = cols[1].text_input("Start time (HH:MM)", placeholder="10:00")
                 end_time = cols[2].text_input("End time (HH:MM)", placeholder="10:30")
@@ -4238,5 +4269,3 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
-
-
