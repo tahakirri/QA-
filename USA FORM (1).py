@@ -1476,6 +1476,7 @@ def agent_break_dashboard():
     agent_id = st.session_state.username
     morocco_tz = pytz.timezone('Africa/Casablanca')
     now_casa = datetime.now(morocco_tz)
+    server_time_iso = now_casa.isoformat()
     casa_date = now_casa.strftime('%Y-%m-%d')
     current_date = casa_date  # Use Casablanca date for all booking logic
 
