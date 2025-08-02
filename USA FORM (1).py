@@ -2691,31 +2691,38 @@ else:
                 <script>
                 const currentPending = {pending_requests};
                 const key = 'lastPendingRequests';
+
                 function notifyNewRequest() {{
                     if (Notification.permission === "granted") {{
-                        new Notification("New Request", {{
-                            body: "A new request has been submitted."
-                        }});
+                        new Notification("New Request", {{ body: "A new request has been submitted." }});
                     }} else if (Notification.permission !== "denied") {{
-                        Notification.requestPermission().then((perm) => {{
+                        Notification.requestPermission().then(perm => {{
                             if (perm === "granted") {{
-                                new Notification("New Request", {{
-                                    body: "A new request has been submitted."
-                                }});
+                                new Notification("New Request", {{ body: "A new request has been submitted." }});
                             }}
                         }});
                     }}
                 }}
-                function pollRequests() {{
+
+                function checkAndNotify() {{
                     let last = parseInt(window.localStorage.getItem(key) || '0');
                     if (currentPending > last) {{
                         notifyNewRequest();
                     }}
                     window.localStorage.setItem(key, currentPending);
                 }}
-                setInterval(pollRequests, 10000);
-                // Run on load
-                pollRequests();
+
+                // Run the check on initial load
+                checkAndNotify();
+
+                // Set up a polling interval only if one isn't already running
+                if (!window.adminNotificationInterval) {{
+                    console.log('Starting admin notification poller.');
+                    window.adminNotificationInterval = setInterval(() => {{
+                        // This reload will fetch new data from the server
+                        window.location.reload();
+                    }}, 15000); // Poll every 15 seconds
+                }}
                 </script>
                 '''
                 components.html(js_code, height=0)
