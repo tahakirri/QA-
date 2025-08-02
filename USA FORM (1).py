@@ -1534,74 +1534,58 @@ def agent_break_dashboard():
                 else:
                     st.write(f"**{display_name}:** {bookings[break_type]}")
 
-        # --- Inject browser notification for breaks 5 min before ---
+        # --- Rerun logic for break notifications ---
         import streamlit.components.v1 as components
         import json
-        # Gather break times for today (format: HH:MM)
-        break_times = []
+        from datetime import datetime
+        import pytz
+
+        casablanca_tz = pytz.timezone('Africa/Casablanca')
+        now_in_casablanca = datetime.now(casablanca_tz)
+
+        confirmed_breaks = st.session_state.agent_bookings.get(current_date, {}).get(agent_id, {})
+        break_times_for_js = []
         for break_type in ['lunch', 'early_tea', 'late_tea']:
-            if break_type in bookings and isinstance(bookings[break_type], dict):
-                t = bookings[break_type].get('time')
-                if t:
-                    break_times.append(t)
-        # Pass current date and break times to JS
-        js_code = f'''
-        <script>
-        const breakTimes = {json.dumps(break_times)};
-        const serverTimeISO = "{server_time_iso}";
-        const notificationKeyPrefix = 'notified_break_';
+            if break_type in confirmed_breaks and isinstance(confirmed_breaks[break_type], dict):
+                break_times_for_js.append(confirmed_breaks[break_type]['time'])
 
-        function checkAndNotifyBreaks() {{
-            // Use server time for accuracy
-            const now = new Date(serverTimeISO);
-            const today = now.toISOString().split('T')[0];
+        for break_time_str in break_times_for_js:
+            h, m = map(int, break_time_str.split(':'))
+            break_datetime = now_in_casablanca.replace(hour=h, minute=m, second=0, microsecond=0)
+            time_diff_minutes = (break_datetime - now_in_casablanca).total_seconds() / 60
 
-            breakTimes.forEach(b => {{
-                const [hours, minutes] = b.split(':');
-                
-                // Create break time object for today in the server's timezone
-                const breakTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
-
-                const diff = breakTime.getTime() - now.getTime();
-                const minutesUntilBreak = Math.floor(diff / (1000 * 60));
-
-                const notificationKey = notificationKeyPrefix + today + '_' + b;
-
-                // Notify if break is 5 minutes away and hasn't been notified today
-                if (minutesUntilBreak >= 4 && minutesUntilBreak < 5 && !localStorage.getItem(notificationKey)) {{
+            if 4 <= time_diff_minutes < 5:
+                notification_key = f"notified_{current_date}_{break_time_str}"
+                if not st.session_state.get(notification_key, False):
+                    js_code_notify = f'''
+                    <script>
                     if (Notification.permission === "granted") {{
-                        new Notification("Break Reminder", {{
-                            body: `Your break starts in 5 minutes at ${{b}}.`
-                        }});
-                        localStorage.setItem(notificationKey, 'true');
+                        new Notification("Break Reminder", {{ body: `Your break at {break_time_str} is in 5 minutes!` }});
                     }} else if (Notification.permission !== "denied") {{
                         Notification.requestPermission().then(perm => {{
                             if (perm === "granted") {{
-                                new Notification("Break Reminder", {{
-                                    body: `Your break starts in 5 minutes at ${{b}}.`
-                                }});
-                                localStorage.setItem(notificationKey, 'true');
+                                new Notification("Break Reminder", {{ body: `Your break at {break_time_str} is in 5 minutes!` }});
                             }}
                         }});
                     }}
-                }}
-            }});
-        }}
+                    </script>
+                    '''
+                    components.html(js_code_notify, height=0)
+                    st.session_state[notification_key] = True
 
-        // Set up a polling interval only if one isn't already running
-        if (!window.breakNotificationInterval) {{
-            console.log('Starting break notification poller.');
-            window.breakNotificationInterval = setInterval(() => {{
-                // Reload to get fresh server time
-                top.location.reload();
-            }}, 60000); // Check every minute
-        }}
+        # Component to trigger rerun every 60 seconds
+        rerun_component_breaks = components.declare_component("rerun_component_breaks", code='''
+            function(element, args) {
+                if (!window.breakRerunInterval) {
+                    window.breakRerunInterval = setInterval(() => {
+                        Streamlit.setComponentValue({rerun: true});
+                    }, 60000);
+                }
+            }
+        ''')
 
-        // Run on initial load
-        checkAndNotifyBreaks();
-        </script>
-        '''
-        components.html(js_code, height=0)
+        if rerun_component_breaks(key='break_rerun'):
+            st.rerun()
         return
     
     # Determine agent's assigned templates
@@ -2697,48 +2681,44 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            # --- Inject browser notification for admin when new request is added ---
+            # --- Rerun logic for admin to check for new requests ---
             if st.session_state.role == "admin":
                 import streamlit.components.v1 as components
-                js_code = f'''
-                <script>
-                const currentPending = {pending_requests};
-                const key = 'lastPendingRequests';
 
-                function notifyNewRequest() {{
-                    if (Notification.permission === "granted") {{
-                        new Notification("New Request", {{ body: "A new request has been submitted." }});
-                    }} else if (Notification.permission !== "denied") {{
-                        Notification.requestPermission().then(perm => {{
-                            if (perm === "granted") {{
-                                new Notification("New Request", {{ body: "A new request has been submitted." }});
-                            }}
-                        }});
-                    }}
-                }}
+                # Check for new requests and notify
+                last_pending_requests = st.session_state.get('last_pending_requests', 0)
+                if pending_requests > last_pending_requests:
+                    js_code_notify = '''
+                    <script>
+                    if (Notification.permission === "granted") {
+                        new Notification("New Request", { body: "A new request has been submitted." });
+                    } else if (Notification.permission !== "denied") {
+                        Notification.requestPermission().then(perm => {
+                            if (perm === "granted") {
+                                new Notification("New Request", { body: "A new request has been submitted." });
+                            }
+                        });
+                    }
+                    </script>
+                    '''
+                    components.html(js_code_notify, height=0)
+                st.session_state.last_pending_requests = pending_requests
 
-                function checkAndNotify() {{
-                    let last = parseInt(window.localStorage.getItem(key) || '0');
-                    if (currentPending > last) {{
-                        notifyNewRequest();
-                    }}
-                    window.localStorage.setItem(key, currentPending);
-                }}
-
-                // Run the check on initial load
-                checkAndNotify();
-
-                // Set up a polling interval only if one isn't already running
-                if (!window.adminNotificationInterval) {{
-                    console.log('Starting admin notification poller to reload top window.');
-                    window.adminNotificationInterval = setInterval(() => {{
-                        // Reload the top-level window to fetch new data from the server
-                        top.location.reload();
-                    }}, 15000); // Poll every 15 seconds
-                }}
-                </script>
-                '''
-                components.html(js_code, height=0)
+                # Component to trigger rerun every 15 seconds
+                rerun_component = components.declare_component("rerun_component_admin", code='''
+                    function(element, args) {
+                        if (!window.adminRerunInterval) {
+                            window.adminRerunInterval = setInterval(() => {
+                                Streamlit.setComponentValue({rerun: true});
+                            }, 15000);
+                        }
+                        // We don't need to render anything.
+                    }
+                ''')
+                
+                # When the component sends a value, rerun the app
+                if rerun_component(key='admin_rerun'):
+                    st.rerun()
 
         
         if st.button("🚪 Logout", use_container_width=True):
