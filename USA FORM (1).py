@@ -3196,7 +3196,7 @@ else:
         else:
             st.error("System is currently locked. Access to HOLD images is disabled.")
 
-    elif st.session_state.current_section == "late_login":
+    elif st.session_state.current_section == "late login":
         st.subheader("⏰ Late Login Report")
         
         if not is_killswitch_enabled():
@@ -4236,4 +4236,5 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
+
 
