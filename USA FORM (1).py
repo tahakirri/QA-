@@ -2767,17 +2767,20 @@ else:
                 const currentPending = {pending_requests};
                 const key = 'lastPendingRequests';
 
-                function notifyNewRequest() {{
-                    if (Notification.permission === "granted") {{
-                        new Notification("New Request", {{ body: "A new request has been submitted." }});
-                    }} else if (Notification.permission !== "denied") {{
-                        Notification.requestPermission().then(perm => {{
-                            if (perm === "granted") {{
-                                new Notification("New Request", {{ body: "A new request has been submitted." }});
-                            }}
-                        }});
-                    }}
-                }}
+function notifyNewRequest(name) {
+    const message = `${name} has submitted a new request.`;
+
+    if (Notification.permission === "granted") {
+        new Notification("New Request", { body: message });
+    } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then(perm => {
+            if (perm === "granted") {
+                new Notification("New Request", { body: message });
+            }
+        });
+    }
+}
+
 
                 function checkAndNotify() {{
                     let last = parseInt(window.localStorage.getItem(key) || '0');
@@ -4238,6 +4241,7 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
+
 
 
 
