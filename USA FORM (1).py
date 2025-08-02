@@ -3508,12 +3508,12 @@ else:
             with st.form("midshift_issue_form"):
                 cols = st.columns(3)
                 issue_type = cols[0].selectbox("Issue Type", [
-                    "Default Not Ready",
-                    "Frozen Workspace",
-                    "Physical Avaya",
-                    "Pc Issue",
-                    "Aaad Tool",
-                    "Disconnected Avaya"
+                "Extension issue",
+                "Windows Issue",
+                "PC Issue",
+                "Disconnected RC",
+                "Frozen Ring"
+
                 ])
                 start_time = cols[1].text_input("Start time (HH:MM)", placeholder="10:00")
                 end_time = cols[2].text_input("End time (HH:MM)", placeholder="10:30")
@@ -4236,3 +4236,4 @@ if __name__ == "__main__":
         st.stop()
     
     st.write("Lyca Management System")
+
