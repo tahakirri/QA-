@@ -3220,12 +3220,23 @@ else:
                     
                     if st.form_submit_button("Send", use_container_width=True):
                         if message.strip():
-                            if send_group_message(st.session_state.username, message, group_filter):
-                                st.session_state.show_emoji_picker = False
-                                    send_group_message(st.session_state.username, message, send_to_group)
-                                else:
-                                    st.warning("No group selected for chat.")
-                                st.rerun()
+                            # For admin: use selected group, for agents: use their assigned group
+                            if st.session_state.role == "admin":
+                                send_to_group = group_filter
+                            else:
+                                # Look up the user's group
+                                send_to_group = None
+                                for u in get_all_users():
+                                    if u[1] == st.session_state.username:
+                                        send_to_group = u[3]
+                                        break
+                            
+                            if send_to_group:
+                                if send_group_message(st.session_state.username, message, send_to_group):
+                                    st.session_state.show_emoji_picker = False
+                                    st.rerun()
+                            else:
+                                st.warning("No group selected for chat.")
         else:
             st.error("System is currently locked. Access to chat is disabled.")
 
