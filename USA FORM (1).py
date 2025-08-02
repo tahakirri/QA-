@@ -1548,44 +1548,57 @@ def agent_break_dashboard():
         js_code = f'''
         <script>
         const breakTimes = {json.dumps(break_times)};
-        const today = "{current_date}";
-        function toMinutes(t) {{
-            const [h, m] = t.split(":").map(Number);
-            return h * 60 + m;
-        }}
-        function checkBreaks() {{
-            const now = new Date();
-            // Casablanca offset (UTC+1 or UTC+0 with DST)
-            // For accuracy, backend should pass the correct date/time, but we'll use local for now.
-            const nowMinutes = now.getHours() * 60 + now.getMinutes();
-            breakTimes.forEach((bt) => {{
-                const [h, m] = bt.split(":").map(Number);
-                const breakMinutes = h * 60 + m;
-                if (breakMinutes - nowMinutes === 5) {{
-                    // Only notify once per break
-                    if (!window.notifiedBreaks) window.notifiedBreaks = {{}};
-                    if (!window.notifiedBreaks[bt + today]) {{
-                        if (Notification.permission === "granted") {{
-                            new Notification("Break Reminder", {{
-                                body: `Your break at ${bt} is in 5 minutes!`
-                            }});
-                        }} else if (Notification.permission !== "denied") {{
-                            Notification.requestPermission().then((perm) => {{
-                                if (perm === "granted") {{
-                                    new Notification("Break Reminder", {{
-                                        body: `Your break at ${bt} is in 5 minutes!`
-                                    }});
-                                }}
-                            }});
-                        }}
-                        window.notifiedBreaks[bt + today] = true;
+        const serverTimeISO = "{server_time_iso}";
+        const notificationKeyPrefix = 'notified_break_';
+
+        function checkAndNotifyBreaks() {{
+            // Use server time for accuracy
+            const now = new Date(serverTimeISO);
+            const today = now.toISOString().split('T')[0];
+
+            breakTimes.forEach(b => {{
+                const [hours, minutes] = b.split(':');
+                
+                // Create break time object for today in the server's timezone
+                const breakTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
+
+                const diff = breakTime.getTime() - now.getTime();
+                const minutesUntilBreak = Math.floor(diff / (1000 * 60));
+
+                const notificationKey = notificationKeyPrefix + today + '_' + b;
+
+                // Notify if break is 5 minutes away and hasn't been notified today
+                if (minutesUntilBreak >= 4 && minutesUntilBreak < 5 && !localStorage.getItem(notificationKey)) {{
+                    if (Notification.permission === "granted") {{
+                        new Notification("Break Reminder", {{
+                            body: `Your break starts in 5 minutes at ${{b}}.`
+                        }});
+                        localStorage.setItem(notificationKey, 'true');
+                    }} else if (Notification.permission !== "denied") {{
+                        Notification.requestPermission().then(perm => {{
+                            if (perm === "granted") {{
+                                new Notification("Break Reminder", {{
+                                    body: `Your break starts in 5 minutes at ${{b}}.`
+                                }});
+                                localStorage.setItem(notificationKey, 'true');
+                            }}
+                        }});
                     }}
                 }}
             }});
         }}
-        setInterval(checkBreaks, 60000);
-        // Also run on load
-        checkBreaks();
+
+        // Set up a polling interval only if one isn't already running
+        if (!window.breakNotificationInterval) {{
+            console.log('Starting break notification poller.');
+            window.breakNotificationInterval = setInterval(() => {{
+                // Reload to get fresh server time
+                top.location.reload();
+            }}, 60000); // Check every minute
+        }}
+
+        // Run on initial load
+        checkAndNotifyBreaks();
         </script>
         '''
         components.html(js_code, height=0)
@@ -2717,10 +2730,10 @@ else:
 
                 // Set up a polling interval only if one isn't already running
                 if (!window.adminNotificationInterval) {{
-                    console.log('Starting admin notification poller.');
+                    console.log('Starting admin notification poller to reload top window.');
                     window.adminNotificationInterval = setInterval(() => {{
-                        // This reload will fetch new data from the server
-                        window.location.reload();
+                        // Reload the top-level window to fetch new data from the server
+                        top.location.reload();
                     }}, 15000); // Poll every 15 seconds
                 }}
                 </script>
