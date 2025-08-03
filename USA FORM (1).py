@@ -1610,7 +1610,7 @@ def agent_break_dashboard():
 
                     if (Notification.permission === 'granted') {{
                         new Notification(breakDisplayName + ' Reminder', {{
-                            body: `Your ${breakDisplayName} starts in ${minutesUntilBreak} minutes at ${time}.`,
+                            body: 'Your ' + breakDisplayName + ' starts in ' + minutesUntilBreak + ' minutes at ' + time + '.',
                             icon: 'https://www.lycamobile.ma/wp-content/uploads/2020/10/favicon.png'
                         }});
                         saveNotificationState(time, true);
@@ -1618,7 +1618,7 @@ def agent_break_dashboard():
                         Notification.requestPermission().then(perm => {{
                             if (perm === 'granted') {{
                                 new Notification(breakDisplayName + ' Reminder', {{
-                                    body: `Your ${breakDisplayName} starts in ${minutesUntilBreak} minutes at ${time}.`,
+                                    body: 'Your ' + breakDisplayName + ' starts in ' + minutesUntilBreak + ' minutes at ' + time + '.',
                                     icon: 'https://www.lycamobile.ma/wp-content/uploads/2020/10/favicon.png'
                                 }});
                                 saveNotificationState(time, true);
@@ -1626,7 +1626,7 @@ def agent_break_dashboard():
                         }});
                     }} else {{
                         // If notifications are blocked, use a fallback alert
-                        console.log(`Break reminder: ${breakDisplayName} at ${time} (in ${minutesUntilBreak} minutes)`);
+                        console.log('Break reminder: ' + breakDisplayName + ' at ' + time + ' (in ' + minutesUntilBreak + ' minutes)');
                     }}
                 }}
             }});
