@@ -1621,10 +1621,10 @@ def agent_break_dashboard():
                                 saveNotificationState(time, true);
                             }}
                         }});
-                    }} else {
+                    }} else {{
                         // If notifications are blocked, use a fallback alert
-                        console.log(`${{breakDisplayName}} reminder: ${{time}} (in ${{minutesUntilBreak}} minutes)`);
-                    }
+                        console.log(`${{breakDisplayName}}} reminder: ${{time}}} (in ${{minutesUntilBreak}}} minutes)`);
+                    }}
                 }}
             }});
         }}
