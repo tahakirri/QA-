@@ -1598,24 +1598,27 @@ def agent_break_dashboard():
 
                 // Only notify if break is upcoming (not in the past) and not already notified
                 if (minutesUntilBreak >= 0 && minutesUntilBreak <= 5 && !wasNotified(time)) {{
-                    const breakType = breakInfo[time]?.type || 'break';
-                    const breakDisplayName = {
-                        'lunch': 'Lunch Break',
-                        'early_tea': 'Early Tea Break',
-                        'late_tea': 'Late Tea Break'
-                    }[breakType] || 'Break';
+                    const breakType = breakInfo[time] ? breakInfo[time].type : 'break';
+                    let breakDisplayName = 'Break';
+                    if (breakType === 'lunch') {
+                        breakDisplayName = 'Lunch Break';
+                    } else if (breakType === 'early_tea') {
+                        breakDisplayName = 'Early Tea Break';
+                    } else if (breakType === 'late_tea') {
+                        breakDisplayName = 'Late Tea Break';
+                    }
 
                     if (Notification.permission === "granted") {{
-                        new Notification(`${{breakDisplayName}} Reminder`, {{
-                            body: `Your ${{breakDisplayName}} starts in ${{minutesUntilBreak}} minutes at ${{time}}.`,
+                        new Notification(breakDisplayName + ' Reminder', {{
+                            body: 'Your ' + breakDisplayName + ' starts in ' + minutesUntilBreak + ' minutes at ' + time + '.',
                             icon: 'https://www.lycamobile.ma/wp-content/uploads/2020/10/favicon.png'
                         }});
                         saveNotificationState(time, true);
                     }} else if (Notification.permission !== "denied") {{
                         Notification.requestPermission().then(perm => {{
                             if (perm === "granted") {{
-                                new Notification(`${{breakDisplayName}} Reminder`, {{
-                                    body: `Your ${{breakDisplayName}} starts in ${{minutesUntilBreak}} minutes at ${{time}}.`,
+                                new Notification(breakDisplayName + ' Reminder', {{
+                                    body: 'Your ' + breakDisplayName + ' starts in ' + minutesUntilBreak + ' minutes at ' + time + '.',
                                     icon: 'https://www.lycamobile.ma/wp-content/uploads/2020/10/favicon.png'
                                 }});
                                 saveNotificationState(time, true);
