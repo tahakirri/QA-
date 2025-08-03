@@ -1540,51 +1540,91 @@ def agent_break_dashboard():
         import json
         # Gather break times for today (format: HH:MM)
         break_times = []
+        break_info = {}
         for break_type in ['lunch', 'early_tea', 'late_tea']:
-            if break_type in bookings and isinstance(bookings[break_type], dict):
-                t = bookings[break_type].get('time')
-                if t:
-                    break_times.append(t)
+            if break_type in bookings and isinstance(bookings[break_type], dict) and 'time' in bookings[break_type]:
+                t = bookings[break_type]['time']
+                break_times.append(t)
+                break_info[t] = {
+                    'type': break_type,
+                    'template': bookings[break_type].get('template', '')
+                }
+        
+        # Save break info to session state to persist across page refreshes
+        if 'break_info' not in st.session_state:
+            st.session_state.break_info = break_info
+        
         # Pass current date and break times to JS
         js_code = f'''
         <script>
+        // Initialize break times from the server
         const breakTimes = {json.dumps(break_times)};
+        const breakInfo = {json.dumps(break_info)};
         const serverTimeISO = "{server_time_iso}";
         const notificationKeyPrefix = 'notified_break_';
+        const agentId = "{agent_id}";
+        const currentDate = "{current_date}";
+
+        // Function to save notification state to session storage
+        function saveNotificationState(time, notified) {{
+            const key = `${{notificationKeyPrefix}}${{currentDate}}_${{agentId}}_${{time}}`;
+            if (notified) {{
+                sessionStorage.setItem(key, 'true');
+            }} else {{
+                sessionStorage.removeItem(key);
+            }}
+        }}
+
+        // Function to check if notification was already shown
+        function wasNotified(time) {{
+            const key = `${{notificationKeyPrefix}}${{currentDate}}_${{agentId}}_${{time}}`;
+            return sessionStorage.getItem(key) === 'true';
+        }}
 
         function checkAndNotifyBreaks() {{
             // Use server time for accuracy
             const now = new Date(serverTimeISO);
             const today = now.toISOString().split('T')[0];
 
-            breakTimes.forEach(b => {{
-                const [hours, minutes] = b.split(':');
+            breakTimes.forEach(time => {{
+                const [hours, minutes] = time.split(':');
                 
                 // Create break time object for today in the server's timezone
-                const breakTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
+                const breakTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 
+                                         parseInt(hours), parseInt(minutes), 0);
 
                 const diff = breakTime.getTime() - now.getTime();
                 const minutesUntilBreak = Math.floor(diff / (1000 * 60));
 
-                const notificationKey = notificationKeyPrefix + today + '_' + b;
+                // Only notify if break is upcoming (not in the past) and not already notified
+                if (minutesUntilBreak >= 0 && minutesUntilBreak <= 5 && !wasNotified(time)) {{
+                    const breakType = breakInfo[time]?.type || 'break';
+                    const breakDisplayName = {
+                        'lunch': 'Lunch Break',
+                        'early_tea': 'Early Tea Break',
+                        'late_tea': 'Late Tea Break'
+                    }[breakType] || 'Break';
 
-                // Notify if break is 5 minutes away and hasn't been notified today
-                if (minutesUntilBreak >= 4 && minutesUntilBreak < 5 && !localStorage.getItem(notificationKey)) {{
                     if (Notification.permission === "granted") {{
-                        new Notification("Break Reminder", {{
-                            body: `Your break starts in 5 minutes at ${{b}}.`
+                        new Notification(`${{breakDisplayName}} Reminder`, {{
+                            body: `Your ${{breakDisplayName}} starts in ${{minutesUntilBreak}} minutes at ${{time}}.`,
+                            icon: 'https://www.lycamobile.ma/wp-content/uploads/2020/10/favicon.png'
                         }});
-                        localStorage.setItem(notificationKey, 'true');
+                        saveNotificationState(time, true);
                     }} else if (Notification.permission !== "denied") {{
                         Notification.requestPermission().then(perm => {{
                             if (perm === "granted") {{
-                                new Notification("Break Reminder", {{
-                                    body: `Your break starts in 5 minutes at ${{b}}.`
+                                new Notification(`${{breakDisplayName}} Reminder`, {{
+                                    body: `Your ${{breakDisplayName}} starts in ${{minutesUntilBreak}} minutes at ${{time}}.`,
+                                    icon: 'https://www.lycamobile.ma/wp-content/uploads/2020/10/favicon.png'
                                 }});
-                                localStorage.setItem(notificationKey, 'true');
+                                saveNotificationState(time, true);
                             }}
                         }});
-                    }}
+                    }} else {
+                        // If notifications are blocked, use a fallback alert
+                        console.log(`${{breakDisplayName}} reminder: ${{time}} (in ${{minutesUntilBreak}} minutes)`);
+                    }
                 }}
             }});
         }}
@@ -1592,10 +1632,13 @@ def agent_break_dashboard():
         // Set up a polling interval only if one isn't already running
         if (!window.breakNotificationInterval) {{
             console.log('Starting break notification poller.');
+            // Run immediately on load
+            checkAndNotifyBreaks();
+            
+            // Then set up the interval
             window.breakNotificationInterval = setInterval(() => {{
-                // Simply re-run the notification check without reloading the page
                 checkAndNotifyBreaks();
-            }}, 60000); // Check every minute
+            }}, 30000); // Check every 30 seconds for more accuracy
         }}
 
         // Run on initial load
