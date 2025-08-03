@@ -2818,7 +2818,7 @@ else:
                         if u[1] == st.session_state.username:
                             st.session_state.group_name = u[3]
                             break
-                group_filter = st.session_state.group_name
+                group_filter = st.session_state.get('group_name')
             with st.expander("➕ Submit New Request"):
                 with st.form("request_form"):
                     cols = st.columns([1, 3])
