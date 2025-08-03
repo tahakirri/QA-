@@ -1623,7 +1623,7 @@ def agent_break_dashboard():
                         }});
                     }} else {{
                         // If notifications are blocked, use a fallback alert
-                        console.log(`${{breakDisplayName}}} reminder: ${{time}}} (in ${{minutesUntilBreak}}} minutes)`);
+                        console.log('Break reminder: ' + breakDisplayName + ' at ' + time + ' (in ' + minutesUntilBreak + ' minutes)');
                     }}
                 }}
             }});
