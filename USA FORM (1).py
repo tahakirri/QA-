@@ -4833,6 +4833,11 @@ def handle_message_check():
     if not st.session_state.authenticated:
         return {"new_messages": False, "messages": []}
 
+    # Get admin notification preferences if user is admin
+    admin_prefs = {}
+    if st.session_state.role == 'admin':
+        admin_prefs = get_admin_notification_prefs(st.session_state.username)
+
     current_time = datetime.now()
     if 'last_message_check' not in st.session_state:
         st.session_state.last_message_check = current_time
@@ -4854,15 +4859,28 @@ def handle_message_check():
         for msg in new_messages:
             # Now msg includes group_name as last field
             msg_id, sender, message, ts, mentions, _group_name = msg
-            if sender != st.session_state.username:  # Don't notify about own messages
-                mentions_list = mentions.split(',') if mentions else []
-                if st.session_state.username in mentions_list:
-                    message = f"@{st.session_state.username} {message}"
-                messages_data.append({
-                    "sender": sender,
-                    "message": message
-                })
+            
+            # Skip if this is the user's own message
+            if sender == st.session_state.username:
+                continue
+                
+            # For admins, check notification preferences for this group
+            if st.session_state.role == 'admin' and _group_name and _group_name in admin_prefs and not admin_prefs[_group_name]:
+                continue  # Skip notification for this group if admin has disabled it
+                
+            # Process mentions and add to messages to notify about
+            mentions_list = mentions.split(',') if mentions else []
+            if st.session_state.username in mentions_list:
+                message = f"@{st.session_state.username} {message}"
+                
+            messages_data.append({
+                "sender": sender,
+                "message": message,
+                "group": _group_name
+            })
+            
         return {"new_messages": bool(messages_data), "messages": messages_data}
+        
     return {"new_messages": False, "messages": []}
 
 def convert_to_casablanca_date(date_str):
