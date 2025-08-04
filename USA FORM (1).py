@@ -556,18 +556,22 @@ def send_group_message(sender, message, group_name=None):
         
         if group_name is not None:
             # Get all admins who should be notified for this group
+            # First, get all admins
             cursor.execute("""
-                SELECT u.username 
-                FROM users u
-                LEFT JOIN admin_notification_prefs p ON u.username = p.admin_username
-                WHERE u.role = 'admin' 
-                AND (p.group_name IS NULL OR p.group_name = ? OR p.enabled = 1)
-                GROUP BY u.username
-                HAVING COUNT(CASE WHEN p.group_name = ? THEN 1 ELSE NULL END) > 0 
-                    OR COUNT(CASE WHEN p.admin_username IS NULL THEN 1 ELSE NULL END) > 0
-            """, (group_name, group_name))
+                SELECT username FROM users WHERE role = 'admin'
+            """)
+            all_admins = [row[0] for row in cursor.fetchall()]
             
-            admin_recipients = [row[0] for row in cursor.fetchall()]
+            # Then get admins who have explicitly disabled notifications for this group
+            cursor.execute("""
+                SELECT admin_username 
+                FROM admin_notification_prefs 
+                WHERE group_name = ? AND enabled = 0
+            """, (group_name,))
+            excluded_admins = [row[0] for row in cursor.fetchall()]
+            
+            # Include all admins except those who have explicitly disabled notifications for this group
+            admin_recipients = [admin for admin in all_admins if admin not in excluded_admins]
             
             # Store the message
             cursor.execute("""
