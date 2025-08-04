@@ -1483,7 +1483,44 @@ def agent_break_dashboard():
     
     # If no template selected, show template selection
     if st.session_state.selected_template_name is None:
-    
+        agent_id = st.session_state.username
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # Check if user already has bookings for today
+        has_existing_booking = (
+            current_date in st.session_state.agent_bookings and 
+            agent_id in st.session_state.agent_bookings[current_date]
+        )
+        
+        if has_existing_booking:
+            st.session_state.booking_confirmed = True
+            st.session_state.selected_template_name = next(
+                (b.get('template', 'Default Template') 
+                 for b in st.session_state.agent_bookings[current_date][agent_id].values() 
+                 if isinstance(b, dict) and 'template' in b),
+                'Default Template'
+            )
+            st.rerun()
+            
+        # Show template selection
+        st.subheader("Select Your Break Schedule Template")
+        available_templates = [t for t in st.session_state.templates.keys() 
+                             if t in st.session_state.active_templates]
+        
+        if not available_templates:
+            st.warning("No active templates available. Please contact your administrator.")
+            return
+            
+        selected_template = st.selectbox(
+            "Choose your break schedule template:",
+            available_templates,
+            key="template_select"
+        )
+        
+        if st.button("Select Template"):
+            st.session_state.selected_template_name = selected_template
+            st.rerun()
+        return
     agent_id = st.session_state.username
     morocco_tz = pytz.timezone('Africa/Casablanca')
     now_casa = datetime.now(morocco_tz)
