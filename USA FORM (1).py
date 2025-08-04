@@ -1455,23 +1455,34 @@ def check_break_conflicts(selected_breaks):
     
     return None
 
+def refresh_break_data():
+    """Refresh break data from the database files"""
+    try:
+        if os.path.exists('all_bookings.json'):
+            with open('all_bookings.json', 'r') as f:
+                # Only update if the file has content
+                content = f.read()
+                if content.strip():
+                    st.session_state.agent_bookings = json.loads(content)
+    except Exception as e:
+        st.error(f"Error refreshing break data: {str(e)}")
+
 def agent_break_dashboard():
-    st.title("Break Booking")
-    st.markdown("---")
-    
-    if is_killswitch_enabled():
-        st.error("System is currently locked. Break booking is disabled.")
-        return
-    
-    # Initialize session state
-    if 'agent_bookings' not in st.session_state:
-        st.session_state.agent_bookings = {}
+    # Initialize session state if not exists
+    if 'selected_template_name' not in st.session_state:
+        st.session_state.selected_template_name = None
     if 'temp_bookings' not in st.session_state:
         st.session_state.temp_bookings = {}
     if 'booking_confirmed' not in st.session_state:
         st.session_state.booking_confirmed = False
-    if 'selected_template_name' not in st.session_state:
-        st.session_state.selected_template_name = None
+    if 'agent_bookings' not in st.session_state:
+        st.session_state.agent_bookings = {}
+    
+    # Always refresh data from database at the start
+    refresh_break_data()
+    
+    # If no template selected, show template selection
+    if st.session_state.selected_template_name is None:
     
     agent_id = st.session_state.username
     morocco_tz = pytz.timezone('Africa/Casablanca')
@@ -1842,9 +1853,12 @@ def agent_break_dashboard():
                     }
                 
                 st.session_state.agent_bookings[current_date][agent_id] = bookings
-                save_break_data()
-                st.success("Your breaks have been confirmed!")
-                st.rerun()
+                if save_break_data():
+                    st.success("Your breaks have been confirmed!")
+                    # Force a rerun to ensure state is consistent
+                    st.rerun()
+                else:
+                    st.error("Failed to save break bookings. Please try again.")
 
 def is_vip_user(username):
     """Check if a user has VIP status"""
