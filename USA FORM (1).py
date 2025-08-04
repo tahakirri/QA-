@@ -3167,21 +3167,23 @@ else:
             ])
         # Admin and agent see all regular options
         elif st.session_state.role in ["admin", "agent"]:
-            nav_options.extend([
+            nav_options = [
                 ("📋 Requests", "requests"),
-                ("☕ Breaks", "breaks"),
-                ("📊 Live KPIs ", "Live KPIs"),
                 ("❌ Mistakes", "mistakes"),
                 ("💬 Chat", "chat"),
+                ("📊 Live KPIs", "Live KPIs"),
                 ("⏰ Late Login", "late_login"),
                 ("📞 Quality Issues", "quality_issues"),
                 ("🔄 Mid-shift Issues", "midshift_issues"),
                 ("💎 Fancy Number", "fancy_number")
-            ])
+            ]
         
-        # Add admin option for admin users
+        # Add admin section if user is admin
         if st.session_state.role == "admin":
-            nav_options.append(("⚙️ Admin", "admin"))
+            nav_options.extend([
+                ("🔔 Notifications", "notification_preferences"),
+                ("👑 Admin", "admin")
+            ])
         
         for option, value in nav_options:
             if st.button(option, key=f"nav_{value}", use_container_width=True):
@@ -4170,6 +4172,79 @@ else:
             else:
                 st.info("You have no mid-shift issue records")
 
+    elif st.session_state.current_section == "notification_preferences" and st.session_state.role == "admin":
+        st.subheader("🔔 Notification Preferences")
+        st.write("Select which groups you want to receive notifications for:")
+        
+        # Get all available groups
+        all_groups = get_all_groups()
+        
+        # Get current admin's preferences
+        current_admin = st.session_state.username
+        prefs = get_admin_notification_prefs(current_admin)
+        
+        # Create a form for the notification preferences
+        with st.form("notification_prefs_form"):
+            # Default to True for all groups if no preferences set yet
+            group_states = {}
+            
+            # Check each group
+            for group in all_groups:
+                # If preference exists, use it, otherwise default to True
+                group_enabled = prefs.get(group, True)
+                group_states[group] = st.checkbox(
+                    f"Receive notifications for {group}",
+                    value=group_enabled,
+                    key=f"notif_pref_{group}"
+                )
+            
+            # Save button
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                if st.form_submit_button("💾 Save Preferences"):
+                    # Update preferences in the database
+                    for group, enabled in group_states.items():
+                        update_admin_notification_prefs(current_admin, group, enabled)
+                    
+                    st.success("Notification preferences saved successfully!")
+                    st.rerun()
+            
+            with col2:
+                if st.form_submit_button("🔄 Reset to Default"):
+                    # Clear all preferences for this admin (will use default True for all groups)
+                    conn = get_db_connection()
+                    try:
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "DELETE FROM admin_notification_prefs WHERE admin_username = ?", 
+                            (current_admin,)
+                        )
+                        conn.commit()
+                        st.success("Notification preferences reset to default. You will receive notifications for all groups.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error resetting preferences: {e}")
+                    finally:
+                        conn.close()
+        
+        # Show current preferences summary
+        st.subheader("Current Notification Preferences")
+        if not prefs:
+            st.info("🔔 You will receive notifications for all groups by default.")
+        else:
+            enabled_groups = [group for group, enabled in prefs.items() if enabled]
+            disabled_groups = [group for group, enabled in prefs.items() if not enabled]
+            
+            if enabled_groups:
+                st.write("✅ Receiving notifications for:")
+                for group in enabled_groups:
+                    st.write(f"- {group}")
+            
+            if disabled_groups:
+                st.write("\n❌ Not receiving notifications for:")
+                for group in disabled_groups:
+                    st.write(f"- {group}")
+    
     elif st.session_state.current_section == "admin" and st.session_state.role == "admin":
         if st.session_state.username.lower() == "taha kirri":
             st.subheader("🚨 System Killswitch")
