@@ -986,14 +986,75 @@ def bulk_update_template_times(hours):
         return False
 
 def save_break_data():
-    with open('templates.json', 'w') as f:
-        json.dump(st.session_state.templates, f)
-    with open('break_limits.json', 'w') as f:
-        json.dump(st.session_state.break_limits, f)
-    with open('all_bookings.json', 'w') as f:
-        json.dump(st.session_state.agent_bookings, f)
-    with open('active_templates.json', 'w') as f:
-        json.dump(st.session_state.active_templates, f)
+    try:
+        # Ensure the current directory exists for saving files
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if not os.path.exists(current_dir):
+            os.makedirs(current_dir, exist_ok=True)
+        
+        # Save all data with atomic writes to prevent corruption
+        temp_files = []
+        try:
+            # Save to temporary files first
+            temp_file = os.path.join(current_dir, 'all_bookings.json.tmp')
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(st.session_state.agent_bookings, f, indent=2, ensure_ascii=False)
+            temp_files.append(temp_file)
+            
+            # Save other data files if they exist in session state
+            if 'templates' in st.session_state:
+                temp_file = os.path.join(current_dir, 'templates.json.tmp')
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    json.dump(st.session_state.templates, f, indent=2, ensure_ascii=False)
+                temp_files.append(temp_file)
+                
+            if 'break_limits' in st.session_state:
+                temp_file = os.path.join(current_dir, 'break_limits.json.tmp')
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    json.dump(st.session_state.break_limits, f, indent=2, ensure_ascii=False)
+                temp_files.append(temp_file)
+                
+            if 'active_templates' in st.session_state:
+                temp_file = os.path.join(current_dir, 'active_templates.json.tmp')
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    json.dump(st.session_state.active_templates, f, indent=2, ensure_ascii=False)
+                temp_files.append(temp_file)
+            
+            # Atomically rename temp files to actual files
+            for temp_file in temp_files:
+                target_file = temp_file.replace('.tmp', '')
+                try:
+                    if os.path.exists(target_file):
+                        os.replace(temp_file, target_file)
+                    else:
+                        os.rename(temp_file, target_file)
+                except Exception as rename_error:
+                    st.error(f"Error renaming {temp_file} to {target_file}: {str(rename_error)}")
+                    # Clean up any remaining temp files
+                    for f in temp_files:
+                        if os.path.exists(f):
+                            try:
+                                os.remove(f)
+                            except:
+                                pass
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            st.error(f"Error during file operations: {str(e)}")
+            # Clean up any temporary files if there was an error
+            for temp_file in temp_files:
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except Exception as cleanup_error:
+                        st.error(f"Error cleaning up temp file {temp_file}: {str(cleanup_error)}")
+            return False
+            
+    except Exception as e:
+        st.error(f"Unexpected error in save_break_data: {str(e)}")
+        return False
 
 def adjust_time(time_str, offset):
     try:
@@ -1502,13 +1563,37 @@ def agent_break_dashboard():
             )
             st.rerun()
             
-        # Show template selection
-        st.subheader("Select Your Break Schedule Template")
-        available_templates = [t for t in st.session_state.templates.keys() 
-                             if t in st.session_state.active_templates]
+        # Get user's assigned templates from database
+        user_assigned_templates = []
+        try:
+            conn = sqlite3.connect('users.db')
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if "break_templates" in columns:
+                cursor.execute("SELECT break_templates FROM users WHERE username = ?", (agent_id,))
+                result = cursor.fetchone()
+                if result and result[0]:
+                    user_assigned_templates = [t.strip() for t in result[0].split(',') if t.strip()]
+        except Exception as e:
+            st.error(f"Error fetching user templates: {str(e)}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
+        
+        # Filter templates based on user's assigned templates and active status
+        if user_assigned_templates:
+            available_templates = [t for t in user_assigned_templates 
+                                 if t in st.session_state.templates 
+                                 and t in st.session_state.active_templates]
+        else:
+            # If no templates assigned, show all active templates (current behavior)
+            available_templates = [t for t in st.session_state.templates.keys() 
+                                 if t in st.session_state.active_templates]
         
         if not available_templates:
-            st.warning("No active templates available. Please contact your administrator.")
+            st.warning("No active templates available for your account. Please contact your administrator.")
             return
             
         selected_template = st.selectbox(
@@ -1519,6 +1604,7 @@ def agent_break_dashboard():
         
         if st.button("Select Template"):
             st.session_state.selected_template_name = selected_template
+            st.session_state.booking_confirmed = False  # Reset booking confirmed state
             st.rerun()
         return
     agent_id = st.session_state.username
@@ -1889,13 +1975,33 @@ def agent_break_dashboard():
                         "booked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                 
+                # Save to session state first
                 st.session_state.agent_bookings[current_date][agent_id] = bookings
-                if save_break_data():
+                
+                # Save to file
+                save_success = save_break_data()
+                
+                # Set state based on save result
+                st.session_state.booking_confirmed = save_success
+                
+                if save_success:
+                    # Clear temporary state
+                    if 'temp_bookings' in st.session_state:
+                        del st.session_state.temp_bookings
+                    if 'selected_template_name' in st.session_state:
+                        del st.session_state.selected_template_name
+                    
+                    # Show success and rerun to update UI
                     st.success("Your breaks have been confirmed!")
-                    # Force a rerun to ensure state is consistent
+                    time.sleep(1)  # Small delay to show success message
                     st.rerun()
                 else:
                     st.error("Failed to save break bookings. Please try again.")
+                    
+        # Show success message if booking is confirmed
+        if st.session_state.get('booking_confirmed', False):
+            st.success("Your breaks have been confirmed!")
+            # Don't clear the flag here to keep showing the message until next action
 
 def is_vip_user(username):
     """Check if a user has VIP status"""
