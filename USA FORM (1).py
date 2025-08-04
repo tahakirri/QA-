@@ -3087,25 +3087,51 @@ else:
         current_mistakes = get_mistakes()
         current_messages = get_group_messages()
         
+        # Get admin notification preferences if user is admin
+        admin_prefs = {}
+        if st.session_state.role == 'admin':
+            admin_prefs = get_admin_notification_prefs(st.session_state.username)
+        
+        # Process new requests
         new_requests = len(current_requests) - st.session_state.last_request_count
         if new_requests > 0 and st.session_state.last_request_count > 0:
-            st.toast(f"📋 {new_requests} new request(s) submitted!")
+            # Only show request notifications if admin hasn't disabled them for the relevant groups
+            show_request_notif = True
+            if st.session_state.role == 'admin' and admin_prefs:
+                # Check if admin has any groups enabled for request notifications
+                show_request_notif = any(enabled for group, enabled in admin_prefs.items())
+                
+            if show_request_notif:
+                st.toast(f"📋 {new_requests} new request(s) submitted!")
         st.session_state.last_request_count = len(current_requests)
         
+        # Process new mistakes
         new_mistakes = len(current_mistakes) - st.session_state.last_mistake_count
         if new_mistakes > 0 and st.session_state.last_mistake_count > 0:
             st.toast(f"❌ {new_mistakes} new mistake(s) reported!")
         st.session_state.last_mistake_count = len(current_mistakes)
         
+        # Process new messages
         current_message_ids = [msg[0] for msg in current_messages]
         new_messages = [msg for msg in current_messages if msg[0] not in st.session_state.last_message_ids]
+        
         for msg in new_messages:
-            if msg[1] != st.session_state.username:
-                mentions = msg[4].split(',') if msg[4] else []
-                if st.session_state.username in mentions:
+            if msg[1] != st.session_state.username:  # Don't show notifications for own messages
+                group_name = msg[5] if len(msg) > 5 else None
+                is_mentioned = st.session_state.username in (msg[4].split(',') if msg[4] else [])
+                
+                # For admins, check notification preferences
+                if st.session_state.role == 'admin' and group_name:
+                    # Check if admin has disabled notifications for this group
+                    if group_name in admin_prefs and not admin_prefs[group_name]:
+                        continue  # Skip notification for this message
+                
+                # Show notification
+                if is_mentioned:
                     st.toast(f"💬 You were mentioned by {msg[1]}!")
                 else:
-                    st.toast(f"💬 New message from {msg[1]}!")
+                    st.toast(f"💬 New message from {msg[1]} in {group_name if group_name else 'general'}!")
+        
         st.session_state.last_message_ids = current_message_ids
 
     show_notifications()
