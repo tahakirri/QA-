@@ -112,7 +112,34 @@ def init_db():
                 username TEXT UNIQUE,
                 password TEXT,
                 role TEXT CHECK(role IN ('agent', 'admin', 'qa')),
-                group_name TEXT
+                group_name TEXT,
+                break_templates TEXT
+            )
+        """)
+        
+        # Create notifications table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                recipient TEXT NOT NULL,
+                message TEXT NOT NULL,
+                type TEXT,
+                reference_id INTEGER,
+                is_read BOOLEAN DEFAULT 0,
+                created_at TEXT NOT NULL,
+                read_at TEXT,
+                FOREIGN KEY (recipient) REFERENCES users(username) ON DELETE CASCADE
+            )
+        """)
+        
+        # Create admin_notification_prefs table if it doesn't exist
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS admin_notification_prefs (
+                admin_username TEXT NOT NULL,
+                group_name TEXT NOT NULL,
+                enabled BOOLEAN DEFAULT 1,
+                PRIMARY KEY (admin_username, group_name),
+                FOREIGN KEY (admin_username) REFERENCES users(username) ON DELETE CASCADE
             )
         """)
         # MIGRATION: Add group_name if not exists
@@ -339,6 +366,8 @@ def add_request(agent_name, request_type, identifier, comment, group_name=None):
     try:
         cursor = conn.cursor()
         timestamp = get_casablanca_time()
+        
+        # Insert the request
         if group_name is not None:
             cursor.execute("""
                 INSERT INTO requests (agent_name, request_type, identifier, comment, timestamp, group_name) 
@@ -352,13 +381,51 @@ def add_request(agent_name, request_type, identifier, comment, group_name=None):
         
         request_id = cursor.lastrowid
         
+        # Add initial comment
         cursor.execute("""
             INSERT INTO request_comments (request_id, user, comment, timestamp)
             VALUES (?, ?, ?, ?)
         """, (request_id, agent_name, f"Request created: {comment}", timestamp))
         
+        # Notify relevant admins based on group
+        if group_name:
+            # Get admins who should be notified for this group
+            cursor.execute("""
+                SELECT u.username 
+                FROM users u
+                LEFT JOIN admin_notification_prefs p ON u.username = p.admin_username
+                WHERE u.role = 'admin' 
+                AND (p.group_name = ? OR p.group_name IS NULL OR p.enabled = 1)
+                GROUP BY u.username
+                HAVING COUNT(CASE WHEN p.group_name = ? THEN 1 ELSE NULL END) > 0 
+                    OR COUNT(CASE WHEN p.admin_username IS NULL THEN 1 ELSE NULL END) > 0
+            """, (group_name, group_name))
+        else:
+            # For requests without a group, notify all admins who accept global notifications
+            cursor.execute("""
+                SELECT username FROM users 
+                WHERE role = 'admin' 
+                AND username NOT IN (
+                    SELECT admin_username FROM admin_notification_prefs 
+                    WHERE group_name IS NOT NULL AND enabled = 0
+                )
+            """)
+        
+        admin_recipients = [row[0] for row in cursor.fetchall()]
+        
+        # Create notifications for admins
+        if admin_recipients:
+            cursor.executemany("""
+                INSERT INTO notifications (recipient, message, type, reference_id, created_at)
+                VALUES (?, ?, 'new_request', ?, ?)
+            """, [(admin, f"New {request_type} request from {agent_name}", request_id, timestamp) 
+                  for admin in admin_recipients])
+        
         conn.commit()
         return True
+    except Exception as e:
+        st.error(f"Error creating request: {str(e)}")
+        return False
     finally:
         conn.close()
 
@@ -485,18 +552,100 @@ def send_group_message(sender, message, group_name=None):
         cursor = conn.cursor()
         mentions = re.findall(r'@(\w+)', message)
         reactions_json = json.dumps({})
+        current_time = get_casablanca_time()
+        
         if group_name is not None:
+            # Get all admins who should be notified for this group
+            # First, get all admins
+            cursor.execute("""
+                SELECT username FROM users WHERE role = 'admin'
+            """)
+            all_admins = [row[0] for row in cursor.fetchall()]
+            
+            # Then get admins who have explicitly disabled notifications for this group
+            cursor.execute("""
+                SELECT admin_username 
+                FROM admin_notification_prefs 
+                WHERE group_name = ? AND enabled = 0
+            """, (group_name,))
+            excluded_admins = [row[0] for row in cursor.fetchall()]
+            
+            # Include all admins except those who have explicitly disabled notifications for this group
+            admin_recipients = [admin for admin in all_admins if admin not in excluded_admins]
+            
+            # Store the message
             cursor.execute("""
                 INSERT INTO group_messages (sender, message, timestamp, mentions, group_name, reactions) 
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (sender, message, get_casablanca_time(), ','.join(mentions), group_name, reactions_json))
+            """, (sender, message, current_time, ','.join(mentions), group_name, reactions_json))
+            
+            # Create notifications for mentioned users and admins, respecting notification preferences
+            message_id = cursor.lastrowid
+            
+            # Process mentions first (regular users and admins who haven't disabled notifications)
+            for user in set(mentions):
+                # For mentioned users who are admins, check their notification preferences
+                cursor.execute("""
+                    SELECT role FROM users WHERE username = ?
+                """, (user,))
+                result = cursor.fetchone()
+                
+                # If it's an admin, check their notification preferences
+                if result and result[0] == 'admin':
+                    cursor.execute("""
+                        SELECT 1 FROM admin_notification_prefs 
+                        WHERE admin_username = ? AND group_name = ? AND enabled = 0
+                    """, (user, group_name))
+                    if cursor.fetchone():
+                        continue  # Skip creating notification for this admin
+                
+                # Create notification for this user
+                cursor.execute("""
+                    INSERT INTO notifications (recipient, message, type, reference_id, created_at)
+                    VALUES (?, ?, 'group_mention', ?, ?)
+                """, (user, f"You were mentioned in a group message by {sender}", message_id, current_time))
+            
+            # Now process admin recipients who should be notified about this group
+            for admin in admin_recipients:
+                # Skip if this admin was already processed in the mentions loop
+                if admin in mentions:
+                    continue
+                    
+                cursor.execute("""
+                    INSERT INTO notifications (recipient, message, type, reference_id, created_at)
+                    VALUES (?, ?, 'group_message', ?, ?)
+                """, (admin, f"New message in {group_name} group from {sender}", message_id, current_time))
         else:
+            # For messages without a group, notify all admins who accept global notifications
+            cursor.execute("""
+                SELECT username FROM users 
+                WHERE role = 'admin' 
+                AND username NOT IN (
+                    SELECT admin_username FROM admin_notification_prefs 
+                    WHERE group_name IS NOT NULL AND enabled = 0
+                )
+            """)
+            admin_recipients = [row[0] for row in cursor.fetchall()]
+            
             cursor.execute("""
                 INSERT INTO group_messages (sender, message, timestamp, mentions, reactions) 
                 VALUES (?, ?, ?, ?, ?)
-            """, (sender, message, get_casablanca_time(), ','.join(mentions), reactions_json))
+            """, (sender, message, current_time, ','.join(mentions), reactions_json))
+            
+            # Create notifications for mentioned users and admins
+            all_mentions = set(mentions + admin_recipients)
+            if all_mentions:
+                cursor.executemany("""
+                    INSERT INTO notifications (recipient, message, type, reference_id, created_at)
+                    VALUES (?, ?, 'group_mention', ?, ?)
+                """, [(user, f"You were mentioned in a message by {sender}", cursor.lastrowid, current_time) 
+                      for user in all_mentions])
+        
         conn.commit()
         return True
+    except Exception as e:
+        st.error(f"Error sending message: {str(e)}")
+        return False
     finally:
         conn.close()
 
@@ -904,6 +1053,137 @@ def get_vip_messages():
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM vip_messages ORDER BY timestamp DESC LIMIT 50")
         return cursor.fetchall()
+    finally:
+        conn.close()
+
+def get_admin_notification_prefs(admin_username):
+    """Get notification preferences for an admin."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Get all groups and their notification status for this admin
+        cursor.execute("""SELECT group_name, enabled FROM admin_notification_prefs WHERE admin_username = ?""", (admin_username,))
+        return {row[0]: bool(row[1]) for row in cursor.fetchall()}
+    finally:
+        conn.close()
+
+def get_unread_notification_count(username):
+    """Get count of unread notifications for a user."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM notifications 
+            WHERE recipient = ? AND is_read = 0
+        """, (username,))
+        return cursor.fetchone()[0]
+    finally:
+        conn.close()
+
+def get_notifications(username, limit=10, unread_only=False):
+    """Get notifications for a user."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        query = """
+            SELECT id, message, type, reference_id, is_read, created_at, read_at
+            FROM notifications 
+            WHERE recipient = ?
+        """
+        params = [username]
+        
+        if unread_only:
+            query += " AND is_read = 0"
+            
+        query += " ORDER BY created_at DESC"
+        
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+            
+        cursor.execute(query, params)
+        columns = [column[0] for column in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+def mark_notification_read(notification_id, username):
+    """Mark a notification as read."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE notifications 
+            SET is_read = 1, read_at = ? 
+            WHERE id = ? AND recipient = ?
+        """, (get_casablanca_time(), notification_id, username))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def mark_all_notifications_read(username):
+    """Mark all notifications as read for a user."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE notifications 
+            SET is_read = 1, read_at = ? 
+            WHERE recipient = ? AND is_read = 0
+        """, (get_casablanca_time(), username))
+        conn.commit()
+        return cursor.rowcount
+    finally:
+        conn.close()
+
+def create_notification(recipient, message, notification_type=None, reference_id=None):
+    """Create a new notification."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO notifications 
+            (recipient, message, type, reference_id, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (recipient, message, notification_type, reference_id, get_casablanca_time()))
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+def update_admin_notification_prefs(admin_username, group_name, enabled):
+    """Update notification preference for a specific admin and group."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""INSERT OR REPLACE INTO admin_notification_prefs (admin_username, group_name, enabled) VALUES (?, ?, ?)""", (admin_username, group_name, 1 if enabled else 0))
+        conn.commit()
+    finally:
+        conn.close()
+
+def get_all_groups():
+    """Get all unique group names from users."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT group_name FROM users WHERE group_name IS NOT NULL")
+        return [row[0] for row in cursor.fetchall() if row[0]]
+    finally:
+        conn.close()
+
+def should_notify_admin(admin_username, group_name):
+    """Check if admin should be notified about this group's notifications."""
+    if not group_name:  # Always notify if no group specified
+        return True
+        
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""SELECT enabled FROM admin_notification_prefs WHERE admin_username = ? AND group_name = ?""", (admin_username, group_name))
+        result = cursor.fetchone()
+        return result[0] if result else True  # Default to True if no preference set
     finally:
         conn.close()
 
@@ -1605,13 +1885,15 @@ def agent_break_dashboard():
         selected_template = st.selectbox(
             "Choose your break schedule template:",
             available_templates,
-            key="template_select"
+            index=None,
+            placeholder="Select a template..."
         )
         
-        if st.button("Select Template"):
-            st.session_state.selected_template_name = selected_template
-            st.session_state.booking_confirmed = False  # Reset booking confirmed state
-            st.rerun()
+        if selected_template:
+            if st.button("Select Template"):
+                st.session_state.selected_template_name = selected_template
+                st.session_state.booking_confirmed = False  # Reset booking confirmed state
+                st.rerun()
         return
     agent_id = st.session_state.username
     morocco_tz = pytz.timezone('Africa/Casablanca')
@@ -1798,12 +2080,13 @@ def agent_break_dashboard():
         cursor = conn.cursor()
         # Defensive: Check if break_templates column exists
         cursor.execute("PRAGMA table_info(users)")
-        columns = [row[1] for row in cursor.fetchall()]
+        columns = [column[1] for column in cursor.fetchall()]
+        
         if "break_templates" in columns:
             cursor.execute("SELECT break_templates FROM users WHERE username = ?", (agent_id,))
-            row = cursor.fetchone()
-            if row and row[0]:
-                agent_templates = [t.strip() for t in row[0].split(',') if t.strip()]
+            result = cursor.fetchone()
+            if result and result[0]:
+                agent_templates = [t.strip() for t in result[0].split(',') if t.strip()]
     except Exception:
         agent_templates = []
     finally:
@@ -1841,6 +2124,7 @@ def agent_break_dashboard():
             if st.button("Continue to Break Selection"):
                 if selected_template in agent_templates:  # Double-check template is assigned
                     st.session_state.selected_template_name = selected_template
+                    st.session_state.booking_confirmed = False  # Reset booking confirmed state
                     st.rerun()
                 else:
                     st.error("You are not authorized to select this template.")
@@ -2623,8 +2907,8 @@ def inject_custom_css():
         button[data-testid="baseButton-secondary"]:hover,
         .stButton > button:hover {{    
             background-color: {c['button_hover']} !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
         }}
         
         /* Secondary Buttons */
@@ -2645,7 +2929,7 @@ def inject_custom_css():
         div[data-baseweb="button"]:hover {{    
             background-color: {c['button_hover']} !important;
             transform: translateY(-1px) !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
         }}
         
         /* VIP Button */
@@ -2831,11 +3115,62 @@ else:
         welcome_color = '#1e293b' if st.session_state.get('color_mode', 'light') == 'light' else '#fff'
         # Format username for welcome message
         username_display = st.session_state.username
-        if username_display.lower() == "Taha kirri":
+        if username_display.lower() == "taha kirri":
             username_display = "Taha Kirri ⚙️"
         else:
             username_display = username_display.title()
-        st.markdown(f'<h2 style="color: {welcome_color};">✨ Welcome, {username_display}</h2>', unsafe_allow_html=True)
+        
+        # Header with username and notification bell
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.markdown(f'<h2 style="color: {welcome_color};">✨ Welcome, {username_display}</h2>', unsafe_allow_html=True)
+        with col2:
+            # Notification bell with counter
+            unread_count = get_unread_notification_count(st.session_state.username)
+            bell_icon = "🔔" if unread_count == 0 else f"🔴 ({unread_count})"
+            
+            if st.button(bell_icon, key="notification_bell", help="View notifications"):
+                st.session_state.show_notifications = not st.session_state.get('show_notifications', False)
+                st.rerun()
+        
+        # Notification dropdown
+        if st.session_state.get('show_notifications', False):
+            with st.container():
+                st.markdown("### Notifications")
+                
+                # Mark all as read button
+                if st.button("Mark all as read"):
+                    mark_all_notifications_read(st.session_state.username)
+                    st.rerun()
+                
+                # Show notifications
+                notifications = get_notifications(st.session_state.username, limit=10)
+                
+                if not notifications:
+                    st.info("No notifications")
+                else:
+                    for notif in notifications:
+                        with st.container():
+                            # Create columns for notification content and mark as read button
+                            cols = st.columns([4, 1])
+                            with cols[0]:
+                                # Show unread notifications in bold
+                                if notif['is_read']:
+                                    st.markdown(notif['message'])
+                                else:
+                                    st.markdown(f"**{notif['message']}**")
+                                st.caption(notif['created_at'])
+                            
+                            # Mark as read button for unread notifications
+                            with cols[1]:
+                                if not notif['is_read']:
+                                    if st.button("✓", key=f"mark_read_{notif['id']}"):
+                                        mark_notification_read(notif['id'], st.session_state.username)
+                                        st.rerun()
+                            
+                            st.divider()
+                
+                st.markdown("---")
         
         # Theme toggle
         col1, col2 = st.columns([1, 6])
@@ -2864,21 +3199,23 @@ else:
             ])
         # Admin and agent see all regular options
         elif st.session_state.role in ["admin", "agent"]:
-            nav_options.extend([
+            nav_options = [
                 ("📋 Requests", "requests"),
-                ("☕ Breaks", "breaks"),
-                ("📊 Live KPIs ", "Live KPIs"),
                 ("❌ Mistakes", "mistakes"),
                 ("💬 Chat", "chat"),
+                ("📊 Live KPIs", "Live KPIs"),
                 ("⏰ Late Login", "late_login"),
                 ("📞 Quality Issues", "quality_issues"),
                 ("🔄 Mid-shift Issues", "midshift_issues"),
                 ("💎 Fancy Number", "fancy_number")
-            ])
+            ]
         
-        # Add admin option for admin users
+        # Add admin section if user is admin
         if st.session_state.role == "admin":
-            nav_options.append(("⚙️ Admin", "admin"))
+            nav_options.extend([
+                ("🔔 Notifications", "notification_preferences"),
+                ("👑 Admin", "admin")
+            ])
         
         for option, value in nav_options:
             if st.button(option, key=f"nav_{value}", use_container_width=True):
@@ -3867,6 +4204,79 @@ else:
             else:
                 st.info("You have no mid-shift issue records")
 
+    elif st.session_state.current_section == "notification_preferences" and st.session_state.role == "admin":
+        st.subheader("🔔 Notification Preferences")
+        st.write("Select which groups you want to receive notifications for:")
+        
+        # Get all available groups
+        all_groups = get_all_groups()
+        
+        # Get current admin's preferences
+        current_admin = st.session_state.username
+        prefs = get_admin_notification_prefs(current_admin)
+        
+        # Create a form for the notification preferences
+        with st.form("notification_prefs_form"):
+            # Default to True for all groups if no preferences set yet
+            group_states = {}
+            
+            # Check each group
+            for group in all_groups:
+                # If preference exists, use it, otherwise default to True
+                group_enabled = prefs.get(group, True)
+                group_states[group] = st.checkbox(
+                    f"Receive notifications for {group}",
+                    value=group_enabled,
+                    key=f"notif_pref_{group}"
+                )
+            
+            # Save button
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                if st.form_submit_button("💾 Save Preferences"):
+                    # Update preferences in the database
+                    for group, enabled in group_states.items():
+                        update_admin_notification_prefs(current_admin, group, enabled)
+                    
+                    st.success("Notification preferences saved successfully!")
+                    st.rerun()
+            
+            with col2:
+                if st.form_submit_button("🔄 Reset to Default"):
+                    # Clear all preferences for this admin (will use default True for all groups)
+                    conn = get_db_connection()
+                    try:
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "DELETE FROM admin_notification_prefs WHERE admin_username = ?", 
+                            (current_admin,)
+                        )
+                        conn.commit()
+                        st.success("Notification preferences reset to default. You will receive notifications for all groups.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error resetting preferences: {e}")
+                    finally:
+                        conn.close()
+        
+        # Show current preferences summary
+        st.subheader("Current Notification Preferences")
+        if not prefs:
+            st.info("🔔 You will receive notifications for all groups by default.")
+        else:
+            enabled_groups = [group for group, enabled in prefs.items() if enabled]
+            disabled_groups = [group for group, enabled in prefs.items() if not enabled]
+            
+            if enabled_groups:
+                st.write("✅ Receiving notifications for:")
+                for group in enabled_groups:
+                    st.write(f"- {group}")
+            
+            if disabled_groups:
+                st.write("\n❌ Not receiving notifications for:")
+                for group in disabled_groups:
+                    st.write(f"- {group}")
+    
     elif st.session_state.current_section == "admin" and st.session_state.role == "admin":
         if st.session_state.username.lower() == "taha kirri":
             st.subheader("🚨 System Killswitch")
@@ -4032,8 +4442,6 @@ else:
                         )
                     else:
                         selected_templates = []
-                else:
-                    selected_templates = []
 
                 if st.form_submit_button("Add User"):
                     def is_password_complex(password):
@@ -4072,7 +4480,7 @@ else:
         users = get_all_users()
         
         # Create tabs for different user types
-        user_tabs = st.tabs(["All Users", "Admins", "Agents", "QA"])
+        user_tabs = st.tabs(["All Users", "Admins", "Agents", "QA", "VIP Management", "Notification Settings"])
         
         # Password reset for admin
         if st.session_state.role == "admin":
