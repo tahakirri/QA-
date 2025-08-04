@@ -1582,15 +1582,21 @@ def agent_break_dashboard():
             if 'conn' in locals():
                 conn.close()
         
-        # Filter templates based on user's assigned templates and active status
+        # Get all available templates that are active
+        all_active_templates = [t for t in st.session_state.templates.keys() 
+                              if t in st.session_state.active_templates]
+        
+        # If user has specific templates assigned, filter to only those
         if user_assigned_templates:
             available_templates = [t for t in user_assigned_templates 
-                                 if t in st.session_state.templates 
-                                 and t in st.session_state.active_templates]
+                                 if t in all_active_templates]
         else:
-            # If no templates assigned, show all active templates (current behavior)
-            available_templates = [t for t in st.session_state.templates.keys() 
-                                 if t in st.session_state.active_templates]
+            # If no specific templates assigned, show all active templates
+            available_templates = all_active_templates
+            
+        # If admin, allow all active templates regardless of assignment
+        if st.session_state.get('role') == 'admin':
+            available_templates = all_active_templates
         
         if not available_templates:
             st.warning("No active templates available for your account. Please contact your administrator.")
@@ -1975,33 +1981,36 @@ def agent_break_dashboard():
                         "booked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                 
-                # Save to session state first
-                st.session_state.agent_bookings[current_date][agent_id] = bookings
-                
-                # Save to file
-                save_success = save_break_data()
-                
-                # Set state based on save result
-                st.session_state.booking_confirmed = save_success
-                
-                if save_success:
-                    # Clear temporary state
-                    if 'temp_bookings' in st.session_state:
-                        del st.session_state.temp_bookings
-                    if 'selected_template_name' in st.session_state:
-                        del st.session_state.selected_template_name
+                try:
+                    # Save to session state first
+                    st.session_state.agent_bookings[current_date][agent_id] = bookings
                     
-                    # Show success and rerun to update UI
-                    st.success("Your breaks have been confirmed!")
-                    time.sleep(1)  # Small delay to show success message
-                    st.rerun()
-                else:
-                    st.error("Failed to save break bookings. Please try again.")
+                    # Save to file
+                    if save_break_data():
+                        # Clear temporary state
+                        if 'temp_bookings' in st.session_state:
+                            del st.session_state.temp_bookings
+                        if 'selected_template_name' in st.session_state:
+                            del st.session_state.selected_template_name
+                        
+                        # Set success state and rerun
+                        st.session_state.booking_confirmed = True
+                        st.session_state.last_booking_time = datetime.now()
+                        st.rerun()
+                    else:
+                        st.error("Failed to save break bookings. Please try again.")
+                except Exception as e:
+                    st.error(f"An error occurred: {str(e)}")
+                    st.session_state.booking_confirmed = False
                     
-        # Show success message if booking is confirmed
+        # Show success message if booking was just confirmed
         if st.session_state.get('booking_confirmed', False):
-            st.success("Your breaks have been confirmed!")
-            # Don't clear the flag here to keep showing the message until next action
+            last_booking_time = st.session_state.get('last_booking_time')
+            if last_booking_time and (datetime.now() - last_booking_time).total_seconds() < 5:
+                st.success("Your breaks have been confirmed!")
+            else:
+                # Clear the flag if it's been more than 5 seconds
+                st.session_state.booking_confirmed = False
 
 def is_vip_user(username):
     """Check if a user has VIP status"""
